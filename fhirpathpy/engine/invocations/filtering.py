@@ -1,3 +1,4 @@
+from collections import abc
 import numbers
 import fhirpathpy.engine.util as util
 import fhirpathpy.engine.nodes as nodes
@@ -103,7 +104,7 @@ def check_fhir_type(ctx, x, tp):
         return True
 
     if tp == "object":
-        return isinstance(x, dict)
+        return isinstance(x, abc.Mapping)
 
     if tp == "integer" and type(x) == int:
         return True
@@ -122,7 +123,7 @@ def extension(ctx, data, url):
     res = []
     for d in data:
         element = util.get_data(d)
-        if isinstance(element, dict):
+        if isinstance(element, abc.Mapping):
             exts = [e for e in element.get("extension", []) if e["url"] == url]
             if len(exts) > 0:
                 res.append(nodes.ResourceNode.create_node(exts[0], "Extension"))

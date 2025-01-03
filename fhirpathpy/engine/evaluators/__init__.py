@@ -1,3 +1,4 @@
+from collections import abc
 from functools import reduce
 
 import re
@@ -188,14 +189,14 @@ def create_reduce_member_invocation(model, key):
             # Use actualTypes to find the field's value
             for actualType in actualTypes:
                 field = key + actualType
-                if isinstance(res.data, (dict, list)):
+                if isinstance(res.data, (abc.Mapping, list)):
                     toAdd = res.data.get(field)
                     toAdd_ = res.data.get(f"_{field}")
                     if toAdd is not None or toAdd_ is not None:
                         childPath = actualType
                         break
         else:
-            if isinstance(res.data, (dict, list)):
+            if isinstance(res.data, (abc.Mapping, list)):
                 toAdd = res.data.get(key)
                 toAdd_ = res.data.get(f"_{key}")
                 if key == 'extension':

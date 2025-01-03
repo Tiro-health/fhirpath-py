@@ -1,3 +1,4 @@
+from collections import abc
 import datetime
 import json
 import re
@@ -306,10 +307,10 @@ class ResourceNode:
 
     def __init__(self, data, path):
         """
-    If data is a resource (maybe a contained resource) reset the path
-    information to the resource type.
-    """
-        if type(data) == dict and "resourceType" in data:
+        If data is a resource (maybe a contained resource) reset the path
+        information to the resource type.
+        """
+        if isinstance(data, abc.Mapping) and "resourceType" in data:
             path = data["resourceType"]
 
         self.path = path

@@ -1,5 +1,7 @@
 import datetime
 import math
+from collections.abc import Mapping
+from dataclasses import dataclass, fields
 import pytest
 from freezegun import freeze_time
 
@@ -212,7 +214,7 @@ def now_function_test():
         old_now_value = evaluate({}, 'now()')
         frozen_datetime.tick(1.0)
         new_now_value = evaluate({}, 'now()')
-    
+
     assert old_now_value != new_now_value
 
 
@@ -245,4 +247,118 @@ def combining_functions_test(resource, path, expected):
     ],
 )
 def path_functions_test(resource, path, expected):
+    assert evaluate(resource, path) == expected
+
+
+@dataclass(eq=True)
+class NestedMapping(Mapping):
+    d: int
+    e: str
+
+    def __iter__(self):
+        return iter([field.name for field in fields(self)])
+
+    def __getitem__(self, key: str):
+        try:
+            return getattr(self, key)
+        except AttributeError:
+            raise KeyError(key)
+
+    def __len__(self):
+        return len(fields(self))
+
+
+@dataclass(eq=True)
+class CustomMapping(Mapping):
+    a: int
+    b: dict
+    c: NestedMapping
+    d: tuple[NestedMapping, ...]
+    e: list[NestedMapping]
+
+    def __iter__(self):
+        return iter([field.name for field in fields(self)])
+
+    def __getitem__(self, key: str):
+        try:
+            return getattr(self, key)
+        except AttributeError:
+            raise KeyError(key)
+
+    def __len__(self):
+        return len(fields(self))
+
+
+@pytest.mark.parametrize(
+    ("resource", "path", "expected"),
+    [
+        (
+            CustomMapping(
+                a=1,
+                b={"c": True},
+                c=NestedMapping(d=3, e="f"),
+                d=(NestedMapping(d=4, e="x"), NestedMapping(d=3, e="y")),
+                e=[NestedMapping(d=4, e="z"), NestedMapping(d=5, e="w")],
+            ),
+            "a",
+            [1],
+        ),
+        (
+            CustomMapping(
+                a=1,
+                b={"c": True},
+                c=NestedMapping(d=3, e="f"),
+                d=(NestedMapping(d=4, e="x"), NestedMapping(d=3, e="y")),
+                e=[NestedMapping(d=4, e="z"), NestedMapping(d=5, e="w")],
+            ),
+            "b.c",
+            [True],
+        ),
+        (
+            CustomMapping(
+                a=1,
+                b={"c": True},
+                c=NestedMapping(d=3, e="f"),
+                d=(NestedMapping(d=4, e="x"), NestedMapping(d=3, e="y")),
+                e=[NestedMapping(d=4, e="z"), NestedMapping(d=5, e="w")],
+            ),
+            "c",
+            [NestedMapping(d=3, e="f")],
+        ),
+        (
+            CustomMapping(
+                a=1,
+                b={"c": True},
+                c=NestedMapping(d=3, e="f"),
+                d=(NestedMapping(d=4, e="x"), NestedMapping(d=3, e="y")),
+                e=[NestedMapping(d=4, e="z"), NestedMapping(d=5, e="w")],
+            ),
+            "c.d",
+            [3],
+        ),
+        (
+            CustomMapping(
+                a=1,
+                b={"c": True},
+                c=NestedMapping(d=3, e="f"),
+                d=(NestedMapping(d=4, e="x"), NestedMapping(d=3, e="y")),
+                e=[NestedMapping(d=4, e="z"), NestedMapping(d=5, e="w")],
+            ),
+            "e.last()",
+            [NestedMapping(d=5, e="w")],
+        ),
+        (
+            CustomMapping(
+                a=1,
+                b={"c": True},
+                c=NestedMapping(d=3, e="f"),
+                d=(NestedMapping(d=4, e="x"), NestedMapping(d=3, e="y")),
+                e=[NestedMapping(d=4, e="z"), NestedMapping(d=5, e="w")],
+            ),
+            "e.where(d=5)",
+            [NestedMapping(d=5, e="w")],
+        )    
+    ],
+)
+def mappings_test(resource, path, expected):
     assert evaluate(resource, path) == expected
