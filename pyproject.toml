@@ -21,8 +21,12 @@ log_cli_level = "INFO"
 python_functions = "*_test"
 
 [build-system]
-requires = ["flit_core >=3.2,<4"]
-build-backend = "flit_core.buildapi"
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
+
+[tool.maturin]
+module-name = "fhirpathpy._rust"
+python-source = "."
 
 [project]
 name = "fhirpathpy"

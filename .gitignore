@@ -71,8 +71,9 @@ instance/
 # Sphinx documentation
 docs/_build/
 
-# PyBuilder
+# Rust / Cargo build artifacts
 target/
+Cargo.lock
 
 # Jupyter Notebook
 .ipynb_checkpoints
