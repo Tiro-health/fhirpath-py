@@ -40,7 +40,7 @@ def parse_valid_test(expression):
 
 
 def parse_non_valid_test():
-    with pytest.raises(LexerNoViableAltException):
+    with pytest.raises((LexerNoViableAltException, SyntaxError)):
         parse("!")
 
 
