@@ -2,7 +2,7 @@ from decimal import Decimal
 import json
 from collections import OrderedDict
 from functools import reduce
-from fhirpathpy.engine.nodes import ResourceNode, FP_Quantity
+from fhirpathrs.engine.nodes import ResourceNode, FP_Quantity
 
 
 class set_paths:

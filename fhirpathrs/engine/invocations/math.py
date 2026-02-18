@@ -1,7 +1,7 @@
 from decimal import Decimal
-from fhirpathpy.engine.invocations.equality import remove_duplicate_extension
-import fhirpathpy.engine.util as util
-import fhirpathpy.engine.nodes as nodes
+from fhirpathrs.engine.invocations.equality import remove_duplicate_extension
+import fhirpathrs.engine.util as util
+import fhirpathrs.engine.nodes as nodes
 
 """
 Adds the math functions to the given FHIRPath engine.

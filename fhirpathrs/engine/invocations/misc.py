@@ -1,8 +1,8 @@
 import re
 from decimal import Decimal
 
-import fhirpathpy.engine.util as util
-import fhirpathpy.engine.nodes as nodes
+import fhirpathrs.engine.util as util
+import fhirpathrs.engine.nodes as nodes
 
 # This file holds code to hande the FHIRPath Existence functions (5.1 in the
 # specification).

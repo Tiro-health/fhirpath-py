@@ -1,5 +1,5 @@
-from fhirpathpy.engine.invocations.existence import count_fn
-from fhirpathpy.engine.invocations.math import div
+from fhirpathrs.engine.invocations.existence import count_fn
+from fhirpathrs.engine.invocations.math import div
 
 
 def avg_fn(ctx, x):

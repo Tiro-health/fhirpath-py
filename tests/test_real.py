@@ -1,6 +1,6 @@
 import pickle
 
-from fhirpathpy import compile, evaluate
+from fhirpathrs import compile, evaluate
 
 
 def find_concept_test():

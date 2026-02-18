@@ -1,8 +1,8 @@
 from collections import abc
 from decimal import Decimal
 import json
-import fhirpathpy.engine.util as util
-import fhirpathpy.engine.nodes as nodes
+import fhirpathrs.engine.util as util
+import fhirpathrs.engine.nodes as nodes
 
 """
 This file holds code to hande the FHIRPath Math functions.

@@ -1,9 +1,9 @@
 import json
 import numbers
-import fhirpathpy.engine.util as util
-from fhirpathpy.engine.nodes import TypeInfo
-from fhirpathpy.engine.evaluators import evaluators
-from fhirpathpy.engine.invocations import (
+import fhirpathrs.engine.util as util
+from fhirpathrs.engine.nodes import TypeInfo
+from fhirpathrs.engine.evaluators import evaluators
+from fhirpathrs.engine.invocations import (
     invocation_registry as base_invocation_registry,
 )
 

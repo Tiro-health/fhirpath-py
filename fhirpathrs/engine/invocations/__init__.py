@@ -1,20 +1,20 @@
 from decimal import Decimal
 
-import fhirpathpy.engine.invocations.collections as collections
-import fhirpathpy.engine.invocations.existence as existence
-import fhirpathpy.engine.invocations.filtering as filtering
-import fhirpathpy.engine.invocations.subsetting as subsetting
-import fhirpathpy.engine.invocations.strings as strings
-import fhirpathpy.engine.invocations.navigation as navigation
-import fhirpathpy.engine.invocations.combining as combining
-import fhirpathpy.engine.invocations.math as math
-import fhirpathpy.engine.invocations.misc as misc
-import fhirpathpy.engine.invocations.equality as equality
-import fhirpathpy.engine.invocations.logic as logic
-import fhirpathpy.engine.invocations.datetime as datetime
-import fhirpathpy.engine.invocations.types as types
-import fhirpathpy.engine.invocations.aggregate as aggregate
-from fhirpathpy.engine.nodes import FP_DateTime, FP_Quantity, FP_Time
+import fhirpathrs.engine.invocations.collections as collections
+import fhirpathrs.engine.invocations.existence as existence
+import fhirpathrs.engine.invocations.filtering as filtering
+import fhirpathrs.engine.invocations.subsetting as subsetting
+import fhirpathrs.engine.invocations.strings as strings
+import fhirpathrs.engine.invocations.navigation as navigation
+import fhirpathrs.engine.invocations.combining as combining
+import fhirpathrs.engine.invocations.math as math
+import fhirpathrs.engine.invocations.misc as misc
+import fhirpathrs.engine.invocations.equality as equality
+import fhirpathrs.engine.invocations.logic as logic
+import fhirpathrs.engine.invocations.datetime as datetime
+import fhirpathrs.engine.invocations.types as types
+import fhirpathrs.engine.invocations.aggregate as aggregate
+from fhirpathrs.engine.nodes import FP_DateTime, FP_Quantity, FP_Time
 
 invocation_registry = {
     "empty": {"fn": existence.empty_fn},

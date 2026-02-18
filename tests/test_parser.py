@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 from antlr4.error.Errors import LexerNoViableAltException
 
-from fhirpathpy.parser import parse
+from fhirpathrs.parser import parse
 
 ast_fixtures_path = Path(__file__).resolve().parent / "fixtures" / "ast"
 

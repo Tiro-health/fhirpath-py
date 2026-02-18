@@ -73,7 +73,6 @@ docs/_build/
 
 # Rust / Cargo build artifacts
 target/
-Cargo.lock
 
 # Jupyter Notebook
 .ipynb_checkpoints

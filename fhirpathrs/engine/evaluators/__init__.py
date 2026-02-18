@@ -4,9 +4,9 @@ from functools import reduce
 
 import re
 import json
-import fhirpathpy.engine as engine
-import fhirpathpy.engine.util as util
-import fhirpathpy.engine.nodes as nodes
+import fhirpathrs.engine as engine
+import fhirpathrs.engine.util as util
+import fhirpathrs.engine.nodes as nodes
 
 
 def boolean_literal(ctx, parentData, node):

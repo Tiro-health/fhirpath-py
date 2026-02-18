@@ -1,10 +1,10 @@
-from fhirpathpy.engine.invocations.constants import constants
-from fhirpathpy.parser import parse
-from fhirpathpy.engine import do_eval
-from fhirpathpy.engine.util import arraify, get_data, set_paths, process_user_invocation_table
-from fhirpathpy.engine.nodes import FP_Type, ResourceNode
+from fhirpathrs.engine.invocations.constants import constants
+from fhirpathrs.parser import parse
+from fhirpathrs.engine import do_eval
+from fhirpathrs.engine.util import arraify, get_data, set_paths, process_user_invocation_table
+from fhirpathrs.engine.nodes import FP_Type, ResourceNode
 
-__title__ = "fhirpathpy"
+__title__ = "fhirpathrs"
 __version__ = "2.1.0"
 __author__ = "beda.software"
 __license__ = "MIT"

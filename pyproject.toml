@@ -14,7 +14,7 @@ exclude = '''
 
 [tool.pytest.ini_options]
 minversion = "6.0"
-addopts = "-ra -q --color=yes --cov=fhirpathpy --cov-report=xml"
+addopts = "-ra -q --color=yes --cov=fhirpathrs --cov-report=xml"
 testpaths = ["tests"]
 log_cli = true
 log_cli_level = "INFO"
@@ -25,18 +25,18 @@ requires = ["maturin>=1.0,<2.0"]
 build-backend = "maturin"
 
 [tool.maturin]
-module-name = "fhirpathpy._rust"
+module-name = "fhirpathrs._rust"
 python-source = "."
 
 [project]
-name = "fhirpathpy"
-description = "FHIRPath implementation in Python"
+name = "fhirpathrs"
+description = "FHIRPath implementation in Python with a Rust parser"
 readme = "README.md"
 license = { file = "LICENSE.md" }
 keywords = ["fhir", "fhirpath"]
 dynamic = ["version"]
 authors = [{ name = "beda.software", email = "fhirpath@beda.software" }]
-dependencies = ["antlr4-python3-runtime~=4.10", "python-dateutil~=2.8"]
+dependencies = ["python-dateutil~=2.8"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Environment :: Web Environment",
@@ -44,17 +44,18 @@ classifiers = [
     "Operating System :: OS Independent",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Rust",
     "Topic :: Internet :: WWW/HTTP",
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 
 [project.optional-dependencies]
-test = ["pytest==7.1.1", "pyyaml==5.4"]
+test = ["pytest>=7", "pytest-cov", "pyyaml>=5"]
 
 [project.urls]
 Homepage = "https://github.com/beda-software/fhirpath-py"
@@ -62,19 +63,12 @@ Documentation = "https://github.com/beda-software/fhirpath-py#readme"
 Source = "https://github.com/beda-software/fhirpath-py.git"
 Changelog = "https://github.com/beda-software/fhirpath-py/blob/master/CHANGELOG.md"
 
-
 [tool.ruff]
-target-version = "py39"
+target-version = "py310"
 line-length = 100
-include = ["app/**/*.py", "tests/**/*.py"]
+include = ["fhirpathrs/**/*.py", "tests/**/*.py"]
 
 [tool.ruff.lint]
 select = ["B", "F", "I", "E", "UP", "N", "PL", "PERF"]
-# Black is responsible for E501
-# N803/N806 is not relevant for us because we use camelCase for historical reasons
 ignore = ["E501", "N803", "N806"]
 unfixable = ["F401"]
-
-[tool.autohooks]
-mode = "pipenv"
-pre-commit = ["autohooks.plugins.black", "autohooks.plugins.ruff"]
