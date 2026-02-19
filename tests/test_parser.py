@@ -2,7 +2,6 @@ import json
 from pathlib import Path
 
 import pytest
-from antlr4.error.Errors import LexerNoViableAltException
 
 from fhirpathrs.parser import parse
 
@@ -40,7 +39,7 @@ def parse_valid_test(expression):
 
 
 def parse_non_valid_test():
-    with pytest.raises((LexerNoViableAltException, SyntaxError)):
+    with pytest.raises(SyntaxError):
         parse("!")
 
 
