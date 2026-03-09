@@ -14,6 +14,13 @@ __copyright__ = "Copyright 2025 beda.software"
 VERSION = __version__
 
 
+def register_as_fhirpathpy():
+    """Register fhirpathrs as a drop-in replacement for fhirpathpy."""
+    import sys
+
+    sys.modules["fhirpathpy"] = sys.modules[__name__]
+
+
 def apply_parsed_path(resource, parsedPath, context=None, model=None, options=None):
     constants.reset()
     dataRoot = arraify(resource)

@@ -1,22 +1,20 @@
-fhirpath.py
-===========
+fhirpathrs
+==========
 
 [![Build Status](https://github.com/beda-software/fhirpath-py/actions/workflows/build.yaml/badge.svg)](https://github.com/beda-software/fhirpath-py/actions)
 [![codecov](https://codecov.io/gh/beda-software/fhirpath-py/branch/master/graph/badge.svg)](https://codecov.io/gh/beda-software/fhirpath-py)
-[![pypi](https://img.shields.io/pypi/v/fhirpathpy.svg)](https://pypi.org/project/fhirpathpy/)
-[![Supported Python version](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/release/python-380/)
+[![pypi](https://img.shields.io/pypi/v/fhirpathrs.svg)](https://pypi.org/project/fhirpathrs/)
+[![Supported Python version](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/release/python-3100/)
 
-[FHIRPath](https://www.hl7.org/fhir/fhirpath.html) implementation in Python
-
-Parser was generated with [antlr4](https://github.com/antlr/antlr4)
+[FHIRPath](https://www.hl7.org/fhir/fhirpath.html) implementation in Python with a Rust-based parser
 
 # Getting started
 ## Install
-`pip install fhirpathpy`
+`pip install fhirpathrs`
 
 ## Usage
 ```Python
-from fhirpathpy import evaluate
+from fhirpathrs import evaluate
 
 patient = {
   "resourceType": "Patient",
@@ -87,11 +85,11 @@ options.userInvocationTable - a user invocation table used to replace any existi
 
 ## Using data models
 
-The fhirpathpy library comes with pre-defined data models for FHIR versions DSTU2, STU3, R4, and R5. These models can be used within your project.
+The fhirpathrs library comes with pre-defined data models for FHIR versions DSTU2, STU3, R4, and R5. These models can be used within your project.
 
 Example:
 ```python
-from fhirpathpy.models import models
+from fhirpathrs.models import models
 
 
 r4_model = models["r4"]
@@ -131,8 +129,17 @@ result = evaluate(
 It works similarly to [fhirpath.js](https://github.com/HL7/fhirpath.js/tree/master?tab=readme-ov-file#user-defined-functions)
 
 
+## Migrating from fhirpathpy
+
+If you have code that imports `fhirpathpy`, you can register `fhirpathrs` as a drop-in replacement:
+
+```python
+import fhirpathrs
+fhirpathrs.register_as_fhirpathpy()
+
+# Now existing code that does `from fhirpathpy import evaluate` will work
+```
+
 ## Development
 
-To activate git pre-commit hook: `autohooks activate`
-
-To run tests: `pytest`
+To run tests: `uv run pytest`
