@@ -131,13 +131,20 @@ It works similarly to [fhirpath.js](https://github.com/HL7/fhirpath.js/tree/mast
 
 ## Migrating from fhirpathpy
 
-If you have code that imports `fhirpathpy`, you can register `fhirpathrs` as a drop-in replacement:
+`fhirpathrs` is a drop-in replacement for `fhirpathpy`. Simply update your imports:
+
+```diff
+- from fhirpathpy import compile, evaluate
++ from fhirpathrs import compile, evaluate
+```
+
+If you depend on third-party libraries that still import `fhirpathpy`, you can register `fhirpathrs` as an alias. Call this early in your application (e.g. in your entrypoint or `conftest.py`), **before** any `fhirpathpy` imports:
 
 ```python
 import fhirpathrs
 fhirpathrs.register_as_fhirpathpy()
 
-# Now existing code that does `from fhirpathpy import evaluate` will work
+# Any subsequent `from fhirpathpy import ...` will resolve to fhirpathrs
 ```
 
 ## Development
