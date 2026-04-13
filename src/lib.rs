@@ -29,6 +29,10 @@ fn ast_to_pydict(py: Python<'_>, node: &AstNode, tokens: &[lexer::Token]) -> PyR
     // type
     dict.set_item("type", node.node_type)?;
 
+    // byte offsets into the source string
+    dict.set_item("start", node.byte_start)?;
+    dict.set_item("end", node.byte_end)?;
+
     // terminalNodeText
     let tnt = PyList::new(
         py,

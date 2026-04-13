@@ -65,11 +65,15 @@ pub enum TokenKind {
 pub struct Token {
     pub kind: TokenKind,
     pub text: String,
+    pub byte_start: usize,
+    pub byte_end: usize,
 }
 
 pub fn tokenize(input: &str) -> Result<Vec<Token>, String> {
     let mut tokens = Vec::new();
     let chars: Vec<char> = input.chars().collect();
+    // Build a mapping from char index → byte offset in the original string.
+    let char_to_byte: Vec<usize> = input.char_indices().map(|(b, _)| b).collect();
     let len = chars.len();
     let mut i = 0;
 
@@ -106,7 +110,7 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, String> {
                 }
                 continue;
             } else {
-                tokens.push(Token { kind: TokenKind::Slash, text: "/".into() });
+                tokens.push(Token { kind: TokenKind::Slash, text: "/".into(), byte_start: char_to_byte[i], byte_end: char_to_byte[i] + 1 });
                 i += 1;
                 continue;
             }
@@ -115,23 +119,23 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, String> {
         // 3. Multi-char operators
         if c == '!' && i + 1 < len {
             if chars[i + 1] == '=' {
-                tokens.push(Token { kind: TokenKind::NotEq, text: "!=".into() });
+                tokens.push(Token { kind: TokenKind::NotEq, text: "!=".into(), byte_start: char_to_byte[i], byte_end: char_to_byte[i + 1] + 1 });
                 i += 2;
                 continue;
             } else if chars[i + 1] == '~' {
-                tokens.push(Token { kind: TokenKind::NotTilde, text: "!~".into() });
+                tokens.push(Token { kind: TokenKind::NotTilde, text: "!~".into(), byte_start: char_to_byte[i], byte_end: char_to_byte[i + 1] + 1 });
                 i += 2;
                 continue;
             }
             return Err(format!("Unexpected character '!' at position {i}"));
         }
         if c == '<' && i + 1 < len && chars[i + 1] == '=' {
-            tokens.push(Token { kind: TokenKind::LtEq, text: "<=".into() });
+            tokens.push(Token { kind: TokenKind::LtEq, text: "<=".into(), byte_start: char_to_byte[i], byte_end: char_to_byte[i + 1] + 1 });
             i += 2;
             continue;
         }
         if c == '>' && i + 1 < len && chars[i + 1] == '=' {
-            tokens.push(Token { kind: TokenKind::GtEq, text: ">=".into() });
+            tokens.push(Token { kind: TokenKind::GtEq, text: ">=".into(), byte_start: char_to_byte[i], byte_end: char_to_byte[i + 1] + 1 });
             i += 2;
             continue;
         }
@@ -159,25 +163,31 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, String> {
             _ => None,
         };
         if let Some(kind) = single {
-            tokens.push(Token { kind, text: c.to_string() });
+            tokens.push(Token { kind, text: c.to_string(), byte_start: char_to_byte[i], byte_end: char_to_byte[i] + c.len_utf8() });
             i += 1;
             continue;
         }
 
         // 5. $ variables
         if c == '$' {
-            if input[i..].starts_with("$this") && !is_ident_continue(chars.get(i + 5).copied()) {
-                tokens.push(Token { kind: TokenKind::DollarThis, text: "$this".into() });
+            if input[char_to_byte[i]..].starts_with("$this") && !is_ident_continue(chars.get(i + 5).copied()) {
+                let bs = char_to_byte[i];
+                let be = bs + "$this".len();
+                tokens.push(Token { kind: TokenKind::DollarThis, text: "$this".into(), byte_start: bs, byte_end: be });
                 i += 5;
                 continue;
             }
-            if input[i..].starts_with("$index") && !is_ident_continue(chars.get(i + 6).copied()) {
-                tokens.push(Token { kind: TokenKind::DollarIndex, text: "$index".into() });
+            if input[char_to_byte[i]..].starts_with("$index") && !is_ident_continue(chars.get(i + 6).copied()) {
+                let bs = char_to_byte[i];
+                let be = bs + "$index".len();
+                tokens.push(Token { kind: TokenKind::DollarIndex, text: "$index".into(), byte_start: bs, byte_end: be });
                 i += 6;
                 continue;
             }
-            if input[i..].starts_with("$total") && !is_ident_continue(chars.get(i + 6).copied()) {
-                tokens.push(Token { kind: TokenKind::DollarTotal, text: "$total".into() });
+            if input[char_to_byte[i]..].starts_with("$total") && !is_ident_continue(chars.get(i + 6).copied()) {
+                let bs = char_to_byte[i];
+                let be = bs + "$total".len();
+                tokens.push(Token { kind: TokenKind::DollarTotal, text: "$total".into(), byte_start: bs, byte_end: be });
                 i += 6;
                 continue;
             }
@@ -187,13 +197,15 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, String> {
         // 6. DateTime/Time literals (starts with @)
         if c == '@' {
             let start = i;
+            let byte_start = char_to_byte[i];
             i += 1;
             if i < len && chars[i] == 'T' {
                 // Time literal: @T followed by TIMEFORMAT
                 i += 1;
                 i = scan_timeformat(&chars, i);
                 let text: String = chars[start..i].iter().collect();
-                tokens.push(Token { kind: TokenKind::Time, text });
+                let byte_end = if i < len { char_to_byte[i] } else { input.len() };
+                tokens.push(Token { kind: TokenKind::Time, text, byte_start, byte_end });
                 continue;
             }
             // DateTime literal: @YYYY(-MM(-DD(T TIMEFORMAT)?)?)?Z?
@@ -211,27 +223,33 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, String> {
                 i += 1;
             }
             let text: String = chars[start..i].iter().collect();
-            tokens.push(Token { kind: TokenKind::DateTime, text });
+            let byte_end = if i < len { char_to_byte[i] } else { input.len() };
+            tokens.push(Token { kind: TokenKind::DateTime, text, byte_start, byte_end });
             continue;
         }
 
         // 7. String literals (starts with ')
         if c == '\'' {
+            let byte_start = char_to_byte[i];
             let text = scan_quoted(&chars, &mut i, '\'')?;
-            tokens.push(Token { kind: TokenKind::String, text });
+            let byte_end = if i < len { char_to_byte[i] } else { input.len() };
+            tokens.push(Token { kind: TokenKind::String, text, byte_start, byte_end });
             continue;
         }
 
         // 8. Delimited identifiers (starts with `)
         if c == '`' {
+            let byte_start = char_to_byte[i];
             let text = scan_quoted(&chars, &mut i, '`')?;
-            tokens.push(Token { kind: TokenKind::DelimitedIdentifier, text });
+            let byte_end = if i < len { char_to_byte[i] } else { input.len() };
+            tokens.push(Token { kind: TokenKind::DelimitedIdentifier, text, byte_start, byte_end });
             continue;
         }
 
         // 9. Numbers
         if c.is_ascii_digit() {
             let start = i;
+            let byte_start = char_to_byte[i];
             while i < len && chars[i].is_ascii_digit() {
                 i += 1;
             }
@@ -243,17 +261,20 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, String> {
                 }
             }
             let text: String = chars[start..i].iter().collect();
-            tokens.push(Token { kind: TokenKind::Number, text });
+            let byte_end = if i < len { char_to_byte[i] } else { input.len() };
+            tokens.push(Token { kind: TokenKind::Number, text, byte_start, byte_end });
             continue;
         }
 
         // 10. Identifiers and keywords
         if is_ident_start(c) {
             let start = i;
+            let byte_start = char_to_byte[i];
             while i < len && is_ident_continue(Some(chars[i])) {
                 i += 1;
             }
             let text: String = chars[start..i].iter().collect();
+            let byte_end = if i < len { char_to_byte[i] } else { input.len() };
             let kind = match text.as_str() {
                 "true" => TokenKind::True,
                 "false" => TokenKind::False,
@@ -269,14 +290,14 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, String> {
                 "mod" => TokenKind::Mod,
                 _ => TokenKind::Identifier,
             };
-            tokens.push(Token { kind, text });
+            tokens.push(Token { kind, text, byte_start, byte_end });
             continue;
         }
 
         return Err(format!("Unexpected character {c:?} at position {i}"));
     }
 
-    tokens.push(Token { kind: TokenKind::Eof, text: String::new() });
+    tokens.push(Token { kind: TokenKind::Eof, text: String::new(), byte_start: input.len(), byte_end: input.len() });
     Ok(tokens)
 }
 
