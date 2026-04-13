@@ -57,7 +57,7 @@ pub enum DiagnosticCode {
     UnreachableLinkId,
     InvalidAccessorForType,
     MissingAccessorForCoding,
-    ContextTargetNotGroup,
+    ItemReferenceTargetsLeaf,
     ContextUnreachableFromParent,
 }
 
@@ -71,31 +71,17 @@ pub struct Diagnostic {
 
 // ── Unified analysis API ────────────────────────────────────────────────
 
-/// Describes the role an expression plays, which determines which
-/// validations apply. Role-agnostic: works for any SDC expression type.
+/// Describes the scope an expression runs within.
 #[derive(Debug, Clone, Default)]
 pub struct AnalysisContext {
     /// The linkId of the scope this expression runs within.
     /// Used for reachability checks — are the referenced linkIds
     /// descendants of this scope?
-    ///
-    /// Example: if a Composition section has templateExtractContext
-    /// targeting 'group1', child expressions should pass
-    /// `scope_link_id: Some("group1".into())`.
     pub scope_link_id: Option<String>,
 
-    /// Whether this expression is expected to navigate to an item
-    /// (for scoping/iteration), rather than extracting a value.
-    ///
-    /// When true, the target item must be a `group` type.
-    /// Set this for templateExtractContext expressions.
-    pub expects_item_target: bool,
-
     /// The parent scope's context expression (raw FHIRPath string).
-    /// When provided, validates that this expression's target is
-    /// reachable from the parent scope's target.
-    ///
-    /// Only meaningful when `expects_item_target` is true.
+    /// When provided, validates that item references in this expression
+    /// are reachable from the parent scope's target.
     pub parent_context_expr: Option<String>,
 }
 
@@ -135,15 +121,13 @@ pub fn analyze_expression(
         &ann, index,
     ));
 
-    // 3. Context-specific checks — only when expression targets an item for scoping
-    if context.expects_item_target {
-        diagnostics.extend(validate_context::validate_context_from_annotations(
-            expr,
-            &ann,
-            context.parent_context_expr.as_deref(),
-            index,
-        )?);
-    }
+    // 3. Structural checks on item references — applies to ALL expressions
+    diagnostics.extend(validate_context::validate_item_refs(
+        expr,
+        &ann,
+        context.parent_context_expr.as_deref(),
+        index,
+    )?);
 
     Ok(ExpressionAnalysis {
         annotations: ann,
@@ -238,28 +222,53 @@ mod tests {
     }
 
     #[test]
-    fn test_context_expression_non_group_target() {
-        let idx = QuestionnaireIndex::build(&questionnaire());
-        let result = analyze_expression(
-            "item.where(linkId='group1').item.where(linkId='bool1')",
-            &idx,
-            &AnalysisContext {
-                expects_item_target: true,
-                ..Default::default()
-            },
-        ).unwrap();
-        assert!(result.diagnostics.iter().any(|d| d.code == DiagnosticCode::ContextTargetNotGroup));
-    }
-
-    #[test]
-    fn test_context_expression_no_context_checks_without_flag() {
+    fn test_item_ref_to_leaf_is_warning() {
         let idx = QuestionnaireIndex::build(&questionnaire());
         let result = analyze_expression(
             "item.where(linkId='group1').item.where(linkId='bool1')",
             &idx,
             &AnalysisContext::default(),
         ).unwrap();
-        assert!(result.diagnostics.iter().all(|d| d.code != DiagnosticCode::ContextTargetNotGroup));
+        assert!(result.diagnostics.iter().any(|d| d.code == DiagnosticCode::ItemReferenceTargetsLeaf));
+    }
+
+    #[test]
+    fn test_item_ref_to_group_is_clean() {
+        let idx = QuestionnaireIndex::build(&questionnaire());
+        let result = analyze_expression(
+            "item.where(linkId='group1')",
+            &idx,
+            &AnalysisContext::default(),
+        ).unwrap();
+        assert!(result.diagnostics.iter().all(|d| d.code != DiagnosticCode::ItemReferenceTargetsLeaf));
+    }
+
+    #[test]
+    fn test_parent_context_unreachable() {
+        let idx = QuestionnaireIndex::build(&questionnaire());
+        let result = analyze_expression(
+            "item.where(linkId='group2')",
+            &idx,
+            &AnalysisContext {
+                parent_context_expr: Some("%resource.item.where(linkId='group1')".into()),
+                ..Default::default()
+            },
+        ).unwrap();
+        assert!(result.diagnostics.iter().any(|d| d.code == DiagnosticCode::ContextUnreachableFromParent));
+    }
+
+    #[test]
+    fn test_parent_context_reachable() {
+        let idx = QuestionnaireIndex::build(&questionnaire());
+        let result = analyze_expression(
+            "item.where(linkId='subgroup')",
+            &idx,
+            &AnalysisContext {
+                parent_context_expr: Some("%resource.item.where(linkId='group1')".into()),
+                ..Default::default()
+            },
+        ).unwrap();
+        assert!(result.diagnostics.iter().all(|d| d.code != DiagnosticCode::ContextUnreachableFromParent));
     }
 
     #[test]
