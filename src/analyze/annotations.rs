@@ -259,6 +259,11 @@ fn match_qr_path(steps: &[ChainStep]) -> Option<MatchResult> {
                 QRState::Item
             }
 
+            // Answer + "item" -> Item (nested navigation through answer)
+            (QRState::Answer, ChainStepKind::Identifier(name)) if name == "item" => {
+                QRState::Item
+            }
+
             // Answer + "value" -> Value
             (QRState::Answer, ChainStepKind::Identifier(name)) if name == "value" => {
                 QRState::Value
@@ -571,6 +576,17 @@ mod tests {
         assert_eq!(r.len(), 1);
         assert!(matches!(&r[0].kind, AnnotationKind::AnswerReference { link_ids, accessor }
             if link_ids == &["a", "b"] && *accessor == ValueAccessor::Code));
+    }
+
+    #[test]
+    fn test_nested_answer_item_navigation() {
+        let r = annotate_expression(
+            "%context.item.where(linkId='verwijzer').answer.item.where(linkId='verwijzend-ziekenhuis').answer.value.display",
+        )
+        .unwrap();
+        assert_eq!(r.len(), 1);
+        assert!(matches!(&r[0].kind, AnnotationKind::AnswerReference { link_ids, accessor }
+            if link_ids == &["verwijzer", "verwijzend-ziekenhuis"] && *accessor == ValueAccessor::Display));
     }
 
     #[test]
