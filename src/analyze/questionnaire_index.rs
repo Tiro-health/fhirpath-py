@@ -5,7 +5,7 @@ pub struct QuestionnaireItemInfo {
     pub link_id: String,
     pub text: String,
     pub item_type: String,
-    pub answer_options: HashMap<String, String>, // code -> display
+    pub answer_options: HashMap<(String, String), String>, // (system, code) -> display
     pub parent_link_id: Option<String>,
     pub children: Vec<String>,
 }
@@ -36,11 +36,15 @@ impl QuestionnaireIndex {
             let mut answer_options = HashMap::new();
             if let Some(opts) = item.get("answerOption").and_then(|v| v.as_array()) {
                 for opt in opts {
-                    if let (Some(code), Some(display)) = (
+                    if let (Some(system), Some(code), Some(display)) = (
+                        opt.pointer("/valueCoding/system").and_then(|v| v.as_str()),
                         opt.pointer("/valueCoding/code").and_then(|v| v.as_str()),
                         opt.pointer("/valueCoding/display").and_then(|v| v.as_str()),
                     ) {
-                        answer_options.insert(code.to_string(), display.to_string());
+                        answer_options.insert(
+                            (system.to_string(), code.to_string()),
+                            display.to_string(),
+                        );
                     }
                 }
             }
@@ -93,11 +97,11 @@ impl QuestionnaireIndex {
         self.items.get(link_id).map(|i| i.text.as_str())
     }
 
-    pub fn resolve_code_display(&self, link_id: &str, code: &str) -> Option<&str> {
+    pub fn resolve_code_display(&self, link_id: &str, system: &str, code: &str) -> Option<&str> {
         self.items
             .get(link_id)?
             .answer_options
-            .get(code)
+            .get(&(system.to_string(), code.to_string()))
             .map(|s| s.as_str())
     }
 
@@ -182,10 +186,11 @@ mod tests {
     #[test]
     fn test_resolve_code_display() {
         let idx = QuestionnaireIndex::build(&sample_questionnaire());
-        assert_eq!(idx.resolve_code_display("choice1", "A"), Some("Alpha"));
-        assert_eq!(idx.resolve_code_display("choice1", "B"), Some("Beta"));
-        assert_eq!(idx.resolve_code_display("choice1", "C"), None);
-        assert_eq!(idx.resolve_code_display("bool1", "A"), None);
+        assert_eq!(idx.resolve_code_display("choice1", "http://example.com", "A"), Some("Alpha"));
+        assert_eq!(idx.resolve_code_display("choice1", "http://example.com", "B"), Some("Beta"));
+        assert_eq!(idx.resolve_code_display("choice1", "http://example.com", "C"), None);
+        assert_eq!(idx.resolve_code_display("choice1", "http://other.com", "A"), None);
+        assert_eq!(idx.resolve_code_display("bool1", "http://example.com", "A"), None);
     }
 
     #[test]
