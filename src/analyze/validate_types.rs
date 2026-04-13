@@ -1,7 +1,6 @@
 use crate::analyze::{
-    AnnotationKind, Diagnostic, DiagnosticCode, Severity, ValueAccessor,
+    Annotation, AnnotationKind, Diagnostic, DiagnosticCode, Severity, ValueAccessor,
 };
-use crate::analyze::annotations::annotate_expression;
 use crate::analyze::questionnaire_index::QuestionnaireIndex;
 
 /// FHIR value type categories based on Questionnaire item type.
@@ -47,16 +46,15 @@ fn is_valid_accessor(value_type: &FhirValueType, accessor: &ValueAccessor) -> bo
     }
 }
 
-/// Validate that answer value accessors (.code, .display, bare .value) are
-/// appropriate for the Questionnaire item type.
-pub fn validate_value_types(
-    expr: &str,
+/// Internal: validate value types from pre-computed annotations.
+/// Called from `analyze_expression` in mod.rs.
+pub(crate) fn validate_value_types_from_annotations(
+    annotations: &[Annotation],
     index: &QuestionnaireIndex,
-) -> Result<Vec<Diagnostic>, crate::ParseError> {
-    let annotations = annotate_expression(expr)?;
+) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
 
-    for ann in &annotations {
+    for ann in annotations {
         if let AnnotationKind::AnswerReference { link_ids, accessor } = &ann.kind {
             let Some(last_link_id) = link_ids.last() else {
                 continue;
@@ -102,13 +100,19 @@ pub fn validate_value_types(
         }
     }
 
-    Ok(diagnostics)
+    diagnostics
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::analyze::annotations::annotate_expression;
     use serde_json::json;
+
+    fn validate_value_types(expr: &str, index: &QuestionnaireIndex) -> Result<Vec<Diagnostic>, crate::ParseError> {
+        let anns = annotate_expression(expr)?;
+        Ok(validate_value_types_from_annotations(&anns, index))
+    }
 
     fn questionnaire_with_types() -> serde_json::Value {
         json!({
