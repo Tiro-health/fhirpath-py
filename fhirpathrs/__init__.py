@@ -3,6 +3,11 @@ from fhirpathrs.parser import parse
 from fhirpathrs.engine import do_eval
 from fhirpathrs.engine.util import arraify, get_data, set_paths, process_user_invocation_table
 from fhirpathrs.engine.nodes import FP_Type, ResourceNode
+from fhirpathrs._rust import (
+    annotate_expression,
+    analyze_expression,
+    QuestionnaireIndex,
+)
 
 __title__ = "fhirpathrs"
 __version__ = "2.1.0"
