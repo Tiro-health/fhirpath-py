@@ -49,6 +49,8 @@ pub enum Severity {
 pub enum DiagnosticCode {
     InvalidAccessorForType,
     MissingAccessorForCoding,
+    UnknownLinkId,
+    UnreachableLinkId,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -67,3 +69,5 @@ pub use questionnaire_index::QuestionnaireIndex;
 
 pub mod validate_types;
 pub use validate_types::validate_value_types;
+pub mod validate_link_ids;
+pub use validate_link_ids::validate_link_ids;

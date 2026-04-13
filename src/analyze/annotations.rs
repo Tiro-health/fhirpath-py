@@ -10,20 +10,21 @@ use super::{Annotation, AnnotationKind, Span, ValueAccessor};
 
 // ── Helper types ────────────────────────────────────────────────────────
 
-enum ChainStepKind {
+pub(crate) enum ChainStepKind {
     Identifier(String),
     Function { name: String, link_id: Option<String> },
     External,
 }
 
-struct ChainStep {
-    kind: ChainStepKind,
+pub(crate) struct ChainStep {
+    pub(crate) kind: ChainStepKind,
+    pub(crate) link_id_span: Option<Span>,
 }
 
 // ── Helper functions ────────────────────────────────────────────────────
 
 /// If `node` is an Identifier, return its name.
-fn get_identifier_name(node: &AstNode) -> Option<&str> {
+pub(crate) fn get_identifier_name(node: &AstNode) -> Option<&str> {
     if node.node_type == "Identifier" {
         node.terminal_node_text.first().map(|s| s.as_str())
     } else {
@@ -54,7 +55,8 @@ fn extract_string_value(node: &AstNode) -> Option<String> {
 
 /// Extract a linkId from a `where(linkId='...')` call.
 /// `functn` is the `Functn` node inside a `FunctionInvocation`.
-fn extract_link_id_from_where(functn: &AstNode) -> Option<String> {
+/// Returns the linkId string value and the byte span of the string literal.
+pub(crate) fn extract_link_id_from_where(functn: &AstNode) -> Option<(String, Span)> {
     // Functn.children: [Identifier("where"), ParamList]
     let name_node = functn.children.first()?;
     if get_identifier_name(name_node)? != "where" {
@@ -81,7 +83,26 @@ fn extract_link_id_from_where(functn: &AstNode) -> Option<String> {
         return None;
     }
 
-    extract_string_value(right)
+    // Navigate to the StringLiteral node to get its byte span
+    let string_node = find_string_literal_node(right)?;
+    let value = extract_string_value(right)?;
+    Some((value, Span { start: string_node.byte_start, end: string_node.byte_end }))
+}
+
+/// Navigate through TermExpression -> LiteralTerm -> StringLiteral to find the StringLiteral node.
+fn find_string_literal_node(node: &AstNode) -> Option<&AstNode> {
+    let mut current = node;
+    if current.node_type == "TermExpression" {
+        current = current.children.first()?;
+    }
+    if current.node_type == "LiteralTerm" {
+        current = current.children.first()?;
+    }
+    if current.node_type == "StringLiteral" {
+        Some(current)
+    } else {
+        None
+    }
 }
 
 /// Navigate TermExpression -> InvocationTerm -> MemberInvocation -> Identifier to get the name.
@@ -100,7 +121,7 @@ fn extract_member_identifier_name(node: &AstNode) -> Option<&str> {
 }
 
 /// Recursively flatten an InvocationExpression tree into a chain of steps.
-fn decompose_chain(node: &AstNode) -> Option<Vec<ChainStep>> {
+pub(crate) fn decompose_chain(node: &AstNode) -> Option<Vec<ChainStep>> {
     match node.node_type {
         "TermExpression" => {
             let inner = node.children.first()?;
@@ -112,6 +133,7 @@ fn decompose_chain(node: &AstNode) -> Option<Vec<ChainStep>> {
                         let name = get_identifier_name(ident)?.to_string();
                         Some(vec![ChainStep {
                             kind: ChainStepKind::Identifier(name),
+                            link_id_span: None,
                         }])
                     } else {
                         None
@@ -126,6 +148,7 @@ fn decompose_chain(node: &AstNode) -> Option<Vec<ChainStep>> {
                     let _name = get_identifier_name(ident)?;
                     Some(vec![ChainStep {
                         kind: ChainStepKind::External,
+                        link_id_span: None,
                     }])
                 }
                 _ => None,
@@ -143,6 +166,7 @@ fn decompose_chain(node: &AstNode) -> Option<Vec<ChainStep>> {
                     let name = get_identifier_name(ident)?.to_string();
                     steps.push(ChainStep {
                         kind: ChainStepKind::Identifier(name),
+                        link_id_span: None,
                     });
                 }
                 "FunctionInvocation" => {
@@ -152,16 +176,20 @@ fn decompose_chain(node: &AstNode) -> Option<Vec<ChainStep>> {
                     }
                     let func_ident = functn.children.first()?;
                     let func_name = get_identifier_name(func_ident)?.to_string();
-                    let link_id = if func_name == "where" {
-                        extract_link_id_from_where(functn)
+                    let (link_id, link_id_span) = if func_name == "where" {
+                        match extract_link_id_from_where(functn) {
+                            Some((id, span)) => (Some(id), Some(span)),
+                            None => (None, None),
+                        }
                     } else {
-                        None
+                        (None, None)
                     };
                     steps.push(ChainStep {
                         kind: ChainStepKind::Function {
                             name: func_name,
                             link_id,
                         },
+                        link_id_span,
                     });
                 }
                 _ => return None,
