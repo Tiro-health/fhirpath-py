@@ -10,16 +10,21 @@ pub struct AstNode {
     /// Index range [token_start..token_end] into the token vec (for text computation).
     pub token_start: usize,
     pub token_end: usize,
+    /// Byte offsets into the source string.
+    pub byte_start: usize,
+    pub byte_end: usize,
 }
 
 impl AstNode {
-    fn new(node_type: &'static str, token_start: usize) -> Self {
+    fn new(node_type: &'static str, token_start: usize, tokens: &[Token]) -> Self {
         AstNode {
             node_type,
             terminal_node_text: Vec::new(),
             children: Vec::new(),
             token_start,
             token_end: token_start,
+            byte_start: tokens[token_start].byte_start,
+            byte_end: tokens[token_start].byte_start,
         }
     }
 }
@@ -59,6 +64,11 @@ impl<'a> Parser<'a> {
                 self.current().text
             ))
         }
+    }
+
+    fn set_end(&self, node: &mut AstNode) {
+        node.token_end = self.pos;
+        node.byte_end = self.tokens[self.pos.saturating_sub(1)].byte_end;
     }
 
     // ── Entry point ─────────────────────────────────────────────────────
@@ -115,11 +125,11 @@ impl<'a> Parser<'a> {
         while *self.peek() == TokenKind::Is || *self.peek() == TokenKind::As {
             let op_tok = self.advance().clone();
             let type_spec = self.parse_type_specifier()?;
-            let mut node = AstNode::new("TypeExpression", start);
+            let mut node = AstNode::new("TypeExpression", start, self.tokens);
             node.terminal_node_text.push(op_tok.text.clone());
             node.children.push(left);
             node.children.push(type_spec);
-            node.token_end = self.pos;
+            self.set_end(&mut node);
             left = node;
         }
         Ok(left)
@@ -158,10 +168,10 @@ impl<'a> Parser<'a> {
             let start = self.pos;
             let op_tok = self.advance().clone();
             let operand = self.parse_unary()?;
-            let mut node = AstNode::new("PolarityExpression", start);
+            let mut node = AstNode::new("PolarityExpression", start, self.tokens);
             node.terminal_node_text.push(op_tok.text.clone());
             node.children.push(operand);
-            node.token_end = self.pos;
+            self.set_end(&mut node);
             Ok(node)
         } else {
             self.parse_postfix()
@@ -175,22 +185,22 @@ impl<'a> Parser<'a> {
             if *self.peek() == TokenKind::Dot {
                 let dot = self.advance().clone();
                 let inv = self.parse_invocation()?;
-                let mut node = AstNode::new("InvocationExpression", start);
+                let mut node = AstNode::new("InvocationExpression", start, self.tokens);
                 node.terminal_node_text.push(dot.text.clone());
                 node.children.push(left);
                 node.children.push(inv);
-                node.token_end = self.pos;
+                self.set_end(&mut node);
                 left = node;
             } else if *self.peek() == TokenKind::LBracket {
                 let lb = self.advance().clone();
                 let index_expr = self.parse_expression()?;
                 let rb = self.expect(&TokenKind::RBracket)?.clone();
-                let mut node = AstNode::new("IndexerExpression", start);
+                let mut node = AstNode::new("IndexerExpression", start, self.tokens);
                 node.terminal_node_text.push(lb.text.clone());
                 node.terminal_node_text.push(rb.text.clone());
                 node.children.push(left);
                 node.children.push(index_expr);
-                node.token_end = self.pos;
+                self.set_end(&mut node);
                 left = node;
             } else {
                 break;
@@ -202,9 +212,9 @@ impl<'a> Parser<'a> {
     fn parse_term(&mut self) -> Result<AstNode, String> {
         let start = self.pos;
         let inner = self.parse_term_inner()?;
-        let mut term_expr = AstNode::new("TermExpression", start);
+        let mut term_expr = AstNode::new("TermExpression", start, self.tokens);
         term_expr.children.push(inner);
-        term_expr.token_end = self.pos;
+        self.set_end(&mut term_expr);
         Ok(term_expr)
     }
 
@@ -245,11 +255,11 @@ impl<'a> Parser<'a> {
         let lp = self.advance().clone();
         let expr = self.parse_expression()?;
         let rp = self.expect(&TokenKind::RParen)?.clone();
-        let mut node = AstNode::new("ParenthesizedTerm", start);
+        let mut node = AstNode::new("ParenthesizedTerm", start, self.tokens);
         node.terminal_node_text.push(lp.text.clone());
         node.terminal_node_text.push(rp.text.clone());
         node.children.push(expr);
-        node.token_end = self.pos;
+        self.set_end(&mut node);
         Ok(node)
     }
 
@@ -269,37 +279,37 @@ impl<'a> Parser<'a> {
         let start = self.pos;
         let lb = self.advance().clone();
         let rb = self.expect(&TokenKind::RBrace)?.clone();
-        let mut literal = AstNode::new("NullLiteral", start);
+        let mut literal = AstNode::new("NullLiteral", start, self.tokens);
         literal.terminal_node_text.push(lb.text.clone());
         literal.terminal_node_text.push(rb.text.clone());
-        literal.token_end = self.pos;
-        let mut term = AstNode::new("LiteralTerm", start);
+        self.set_end(&mut literal);
+        let mut term = AstNode::new("LiteralTerm", start, self.tokens);
         term.children.push(literal);
-        term.token_end = self.pos;
+        self.set_end(&mut term);
         Ok(term)
     }
 
     fn parse_boolean_literal_term(&mut self) -> Result<AstNode, String> {
         let start = self.pos;
         let tok = self.advance().clone();
-        let mut literal = AstNode::new("BooleanLiteral", start);
+        let mut literal = AstNode::new("BooleanLiteral", start, self.tokens);
         literal.terminal_node_text.push(tok.text.clone());
-        literal.token_end = self.pos;
-        let mut term = AstNode::new("LiteralTerm", start);
+        self.set_end(&mut literal);
+        let mut term = AstNode::new("LiteralTerm", start, self.tokens);
         term.children.push(literal);
-        term.token_end = self.pos;
+        self.set_end(&mut term);
         Ok(term)
     }
 
     fn parse_string_literal_term(&mut self) -> Result<AstNode, String> {
         let start = self.pos;
         let tok = self.advance().clone();
-        let mut literal = AstNode::new("StringLiteral", start);
+        let mut literal = AstNode::new("StringLiteral", start, self.tokens);
         literal.terminal_node_text.push(tok.text.clone());
-        literal.token_end = self.pos;
-        let mut term = AstNode::new("LiteralTerm", start);
+        self.set_end(&mut literal);
+        let mut term = AstNode::new("LiteralTerm", start, self.tokens);
         term.children.push(literal);
-        term.token_end = self.pos;
+        self.set_end(&mut term);
         Ok(term)
     }
 
@@ -310,24 +320,24 @@ impl<'a> Parser<'a> {
         // Check if next token is a unit (string literal or datetime precision word)
         if self.is_unit_start() {
             let unit_node = self.parse_unit()?;
-            let mut quantity = AstNode::new("Quantity", start);
+            let mut quantity = AstNode::new("Quantity", start, self.tokens);
             quantity.terminal_node_text.push(num_tok.text.clone());
             quantity.children.push(unit_node);
-            quantity.token_end = self.pos;
-            let mut ql = AstNode::new("QuantityLiteral", start);
+            self.set_end(&mut quantity);
+            let mut ql = AstNode::new("QuantityLiteral", start, self.tokens);
             ql.children.push(quantity);
-            ql.token_end = self.pos;
-            let mut term = AstNode::new("LiteralTerm", start);
+            self.set_end(&mut ql);
+            let mut term = AstNode::new("LiteralTerm", start, self.tokens);
             term.children.push(ql);
-            term.token_end = self.pos;
+            self.set_end(&mut term);
             Ok(term)
         } else {
-            let mut literal = AstNode::new("NumberLiteral", start);
+            let mut literal = AstNode::new("NumberLiteral", start, self.tokens);
             literal.terminal_node_text.push(num_tok.text.clone());
-            literal.token_end = self.pos;
-            let mut term = AstNode::new("LiteralTerm", start);
+            self.set_end(&mut literal);
+            let mut term = AstNode::new("LiteralTerm", start, self.tokens);
             term.children.push(literal);
-            term.token_end = self.pos;
+            self.set_end(&mut term);
             Ok(term)
         }
     }
@@ -345,7 +355,7 @@ impl<'a> Parser<'a> {
 
     fn parse_unit(&mut self) -> Result<AstNode, String> {
         let start = self.pos;
-        let mut unit = AstNode::new("Unit", start);
+        let mut unit = AstNode::new("Unit", start, self.tokens);
         match self.peek() {
             TokenKind::String => {
                 let tok = self.advance().clone();
@@ -355,15 +365,15 @@ impl<'a> Parser<'a> {
                 let text = self.current().text.clone();
                 if is_datetime_precision(&text) {
                     let tok = self.advance().clone();
-                    let mut dtp = AstNode::new("DateTimePrecision", start);
+                    let mut dtp = AstNode::new("DateTimePrecision", start, self.tokens);
                     dtp.terminal_node_text.push(tok.text.clone());
-                    dtp.token_end = self.pos;
+                    self.set_end(&mut dtp);
                     unit.children.push(dtp);
                 } else if is_plural_datetime_precision(&text) {
                     let tok = self.advance().clone();
-                    let mut pdtp = AstNode::new("PluralDateTimePrecision", start);
+                    let mut pdtp = AstNode::new("PluralDateTimePrecision", start, self.tokens);
                     pdtp.terminal_node_text.push(tok.text.clone());
-                    pdtp.token_end = self.pos;
+                    self.set_end(&mut pdtp);
                     unit.children.push(pdtp);
                 } else {
                     return Err(format!("Expected unit but found identifier {:?}", text));
@@ -371,31 +381,31 @@ impl<'a> Parser<'a> {
             }
             _ => return Err("Expected unit".into()),
         }
-        unit.token_end = self.pos;
+        self.set_end(&mut unit);
         Ok(unit)
     }
 
     fn parse_datetime_literal_term(&mut self) -> Result<AstNode, String> {
         let start = self.pos;
         let tok = self.advance().clone();
-        let mut literal = AstNode::new("DateTimeLiteral", start);
+        let mut literal = AstNode::new("DateTimeLiteral", start, self.tokens);
         literal.terminal_node_text.push(tok.text.clone());
-        literal.token_end = self.pos;
-        let mut term = AstNode::new("LiteralTerm", start);
+        self.set_end(&mut literal);
+        let mut term = AstNode::new("LiteralTerm", start, self.tokens);
         term.children.push(literal);
-        term.token_end = self.pos;
+        self.set_end(&mut term);
         Ok(term)
     }
 
     fn parse_time_literal_term(&mut self) -> Result<AstNode, String> {
         let start = self.pos;
         let tok = self.advance().clone();
-        let mut literal = AstNode::new("TimeLiteral", start);
+        let mut literal = AstNode::new("TimeLiteral", start, self.tokens);
         literal.terminal_node_text.push(tok.text.clone());
-        literal.token_end = self.pos;
-        let mut term = AstNode::new("LiteralTerm", start);
+        self.set_end(&mut literal);
+        let mut term = AstNode::new("LiteralTerm", start, self.tokens);
         term.children.push(literal);
-        term.token_end = self.pos;
+        self.set_end(&mut term);
         Ok(term)
     }
 
@@ -406,29 +416,29 @@ impl<'a> Parser<'a> {
         let child = match self.peek() {
             TokenKind::String => {
                 let tok = self.advance().clone();
-                let mut id = AstNode::new("Identifier", start + 1);
+                let mut id = AstNode::new("Identifier", start + 1, self.tokens);
                 id.terminal_node_text.push(tok.text.clone());
-                id.token_end = self.pos;
+                self.set_end(&mut id);
                 id
             }
             _ => self.parse_identifier()?,
         };
-        let mut ext = AstNode::new("ExternalConstant", start);
+        let mut ext = AstNode::new("ExternalConstant", start, self.tokens);
         ext.terminal_node_text.push(pct.text.clone());
         ext.children.push(child);
-        ext.token_end = self.pos;
-        let mut term = AstNode::new("ExternalConstantTerm", start);
+        self.set_end(&mut ext);
+        let mut term = AstNode::new("ExternalConstantTerm", start, self.tokens);
         term.children.push(ext);
-        term.token_end = self.pos;
+        self.set_end(&mut term);
         Ok(term)
     }
 
     fn parse_invocation_term(&mut self) -> Result<AstNode, String> {
         let start = self.pos;
         let inv = self.parse_invocation()?;
-        let mut term = AstNode::new("InvocationTerm", start);
+        let mut term = AstNode::new("InvocationTerm", start, self.tokens);
         term.children.push(inv);
-        term.token_end = self.pos;
+        self.set_end(&mut term);
         Ok(term)
     }
 
@@ -439,25 +449,25 @@ impl<'a> Parser<'a> {
             TokenKind::DollarThis => {
                 let start = self.pos;
                 let tok = self.advance().clone();
-                let mut node = AstNode::new("ThisInvocation", start);
+                let mut node = AstNode::new("ThisInvocation", start, self.tokens);
                 node.terminal_node_text.push(tok.text.clone());
-                node.token_end = self.pos;
+                self.set_end(&mut node);
                 Ok(node)
             }
             TokenKind::DollarIndex => {
                 let start = self.pos;
                 let tok = self.advance().clone();
-                let mut node = AstNode::new("IndexInvocation", start);
+                let mut node = AstNode::new("IndexInvocation", start, self.tokens);
                 node.terminal_node_text.push(tok.text.clone());
-                node.token_end = self.pos;
+                self.set_end(&mut node);
                 Ok(node)
             }
             TokenKind::DollarTotal => {
                 let start = self.pos;
                 let tok = self.advance().clone();
-                let mut node = AstNode::new("TotalInvocation", start);
+                let mut node = AstNode::new("TotalInvocation", start, self.tokens);
                 node.terminal_node_text.push(tok.text.clone());
-                node.token_end = self.pos;
+                self.set_end(&mut node);
                 Ok(node)
             }
             TokenKind::Identifier
@@ -472,9 +482,9 @@ impl<'a> Parser<'a> {
                 if *self.peek() == TokenKind::LParen {
                     self.parse_function_invocation(start, ident)
                 } else {
-                    let mut node = AstNode::new("MemberInvocation", start);
+                    let mut node = AstNode::new("MemberInvocation", start, self.tokens);
                     node.children.push(ident);
-                    node.token_end = self.pos;
+                    self.set_end(&mut node);
                     Ok(node)
                 }
             }
@@ -492,7 +502,7 @@ impl<'a> Parser<'a> {
         ident: AstNode,
     ) -> Result<AstNode, String> {
         let lp = self.advance().clone();
-        let mut functn = AstNode::new("Functn", start);
+        let mut functn = AstNode::new("Functn", start, self.tokens);
         functn.terminal_node_text.push(lp.text.clone());
         functn.children.push(ident);
         if *self.peek() != TokenKind::RParen {
@@ -501,16 +511,16 @@ impl<'a> Parser<'a> {
         }
         let rp = self.expect(&TokenKind::RParen)?.clone();
         functn.terminal_node_text.push(rp.text.clone());
-        functn.token_end = self.pos;
-        let mut fi = AstNode::new("FunctionInvocation", start);
+        self.set_end(&mut functn);
+        let mut fi = AstNode::new("FunctionInvocation", start, self.tokens);
         fi.children.push(functn);
-        fi.token_end = self.pos;
+        self.set_end(&mut fi);
         Ok(fi)
     }
 
     fn parse_param_list(&mut self) -> Result<AstNode, String> {
         let start = self.pos;
-        let mut pl = AstNode::new("ParamList", start);
+        let mut pl = AstNode::new("ParamList", start, self.tokens);
         let first = self.parse_expression()?;
         pl.children.push(first);
         while *self.peek() == TokenKind::Comma {
@@ -519,7 +529,7 @@ impl<'a> Parser<'a> {
             let next = self.parse_expression()?;
             pl.children.push(next);
         }
-        pl.token_end = self.pos;
+        self.set_end(&mut pl);
         Ok(pl)
     }
 
@@ -535,9 +545,9 @@ impl<'a> Parser<'a> {
             | TokenKind::In => {
                 let start = self.pos;
                 let tok = self.advance().clone();
-                let mut node = AstNode::new("Identifier", start);
+                let mut node = AstNode::new("Identifier", start, self.tokens);
                 node.terminal_node_text.push(tok.text.clone());
-                node.token_end = self.pos;
+                self.set_end(&mut node);
                 Ok(node)
             }
             _ => Err(format!(
@@ -553,15 +563,15 @@ impl<'a> Parser<'a> {
     fn parse_type_specifier(&mut self) -> Result<AstNode, String> {
         let start = self.pos;
         let qi = self.parse_qualified_identifier()?;
-        let mut ts = AstNode::new("TypeSpecifier", start);
+        let mut ts = AstNode::new("TypeSpecifier", start, self.tokens);
         ts.children.push(qi);
-        ts.token_end = self.pos;
+        self.set_end(&mut ts);
         Ok(ts)
     }
 
     fn parse_qualified_identifier(&mut self) -> Result<AstNode, String> {
         let start = self.pos;
-        let mut qi = AstNode::new("QualifiedIdentifier", start);
+        let mut qi = AstNode::new("QualifiedIdentifier", start, self.tokens);
         let first = self.parse_identifier()?;
         qi.children.push(first);
         while *self.peek() == TokenKind::Dot {
@@ -570,7 +580,7 @@ impl<'a> Parser<'a> {
             let next = self.parse_identifier()?;
             qi.children.push(next);
         }
-        qi.token_end = self.pos;
+        self.set_end(&mut qi);
         Ok(qi)
     }
 
@@ -587,11 +597,11 @@ impl<'a> Parser<'a> {
         while ops.contains(self.peek()) {
             let op_tok = self.advance().clone();
             let right = next(self)?;
-            let mut node = AstNode::new(node_type, start);
+            let mut node = AstNode::new(node_type, start, self.tokens);
             node.terminal_node_text.push(op_tok.text.clone());
             node.children.push(left);
             node.children.push(right);
-            node.token_end = self.pos;
+            self.set_end(&mut node);
             left = node;
         }
         Ok(left)

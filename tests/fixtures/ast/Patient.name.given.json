@@ -1,46 +1,94 @@
 {
-  "children": [{
-    "type": "InvocationExpression",
-    "text": "Patient.name.given",
-    "terminalNodeText": ["."],
-    "children": [{
+  "children": [
+    {
       "type": "InvocationExpression",
-      "text": "Patient.name",
-      "terminalNodeText": ["."],
-      "children": [{
-        "type": "TermExpression",
-        "text": "Patient",
-        "terminalNodeText": [],
-        "children": [{
-          "type": "InvocationTerm",
-          "terminalNodeText": [],
-          "children": [{
-            "type": "MemberInvocation",
-            "terminalNodeText": [],
-            "children": [{
-              "type": "Identifier",
+      "start": 0,
+      "end": 18,
+      "terminalNodeText": [
+        "."
+      ],
+      "text": "Patient.name.given",
+      "children": [
+        {
+          "type": "InvocationExpression",
+          "start": 0,
+          "end": 12,
+          "terminalNodeText": [
+            "."
+          ],
+          "text": "Patient.name",
+          "children": [
+            {
+              "type": "TermExpression",
+              "start": 0,
+              "end": 7,
+              "terminalNodeText": [],
               "text": "Patient",
-              "terminalNodeText": ["Patient"]
-            }]
-          }]
-        }]
-      }, {
-        "type": "MemberInvocation",
-        "terminalNodeText": [],
-        "children": [{
-          "type": "Identifier",
-          "text": "name",
-          "terminalNodeText": ["name"]
-        }]
-      }]
-    }, {
-      "type": "MemberInvocation",
-      "terminalNodeText": [],
-      "children": [{
-        "type": "Identifier",
-        "text": "given",
-        "terminalNodeText": ["given"]
-      }]
-    }]
-  }]
+              "children": [
+                {
+                  "type": "InvocationTerm",
+                  "start": 0,
+                  "end": 7,
+                  "terminalNodeText": [],
+                  "children": [
+                    {
+                      "type": "MemberInvocation",
+                      "start": 0,
+                      "end": 7,
+                      "terminalNodeText": [],
+                      "children": [
+                        {
+                          "type": "Identifier",
+                          "start": 0,
+                          "end": 7,
+                          "terminalNodeText": [
+                            "Patient"
+                          ],
+                          "text": "Patient"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "MemberInvocation",
+              "start": 8,
+              "end": 12,
+              "terminalNodeText": [],
+              "children": [
+                {
+                  "type": "Identifier",
+                  "start": 8,
+                  "end": 12,
+                  "terminalNodeText": [
+                    "name"
+                  ],
+                  "text": "name"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "MemberInvocation",
+          "start": 13,
+          "end": 18,
+          "terminalNodeText": [],
+          "children": [
+            {
+              "type": "Identifier",
+              "start": 13,
+              "end": 18,
+              "terminalNodeText": [
+                "given"
+              ],
+              "text": "given"
+            }
+          ]
+        }
+      ]
+    }
+  ]
 }
