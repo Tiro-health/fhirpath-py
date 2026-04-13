@@ -20,7 +20,7 @@ enum FhirValueType {
 
 fn value_type_for_item(item_type: &str) -> Option<FhirValueType> {
     match item_type {
-        "choice" | "open-choice" => Some(FhirValueType::Coding),
+        "choice" | "open-choice" | "coding" => Some(FhirValueType::Coding),
         "boolean" | "decimal" | "integer" | "string" | "text" | "url" => {
             Some(FhirValueType::Primitive)
         }
