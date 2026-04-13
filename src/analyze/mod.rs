@@ -51,6 +51,8 @@ pub enum DiagnosticCode {
     MissingAccessorForCoding,
     UnknownLinkId,
     UnreachableLinkId,
+    ContextTargetNotGroup,
+    ContextUnreachableFromParent,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -71,3 +73,5 @@ pub mod validate_types;
 pub use validate_types::validate_value_types;
 pub mod validate_link_ids;
 pub use validate_link_ids::validate_link_ids;
+pub mod validate_context;
+pub use validate_context::validate_context;
