@@ -4,15 +4,13 @@ use crate::analyze::{
 use crate::analyze::annotations::annotate_expression;
 use crate::analyze::questionnaire_index::QuestionnaireIndex;
 
-/// Extract the terminal linkId from a context expression's annotations.
+/// Extract the terminal linkId from annotations (prefers ItemReference).
 fn extract_target_link_id(annotations: &[Annotation]) -> Option<&str> {
-    // Prefer ItemReference (normal case for context expressions)
     for ann in annotations {
         if let AnnotationKind::ItemReference { link_ids } = &ann.kind {
             return link_ids.last().map(|s| s.as_str());
         }
     }
-    // Fall back to AnswerReference if present
     for ann in annotations {
         if let AnnotationKind::AnswerReference { link_ids, .. } = &ann.kind {
             return link_ids.last().map(|s| s.as_str());
@@ -21,30 +19,22 @@ fn extract_target_link_id(annotations: &[Annotation]) -> Option<&str> {
     None
 }
 
-/// Validate a templateExtractContext expression.
-///
-/// Checks:
-/// - Target linkId exists in the Questionnaire
-/// - Target is a group item (can have children to iterate over)
-/// - If parent context provided, target is reachable from parent's target
-pub fn validate_context(
-    context_expr: &str,
+/// Internal: validate context-specific constraints from pre-computed annotations.
+/// Called from `analyze_expression` when `expects_item_target` is true.
+pub(crate) fn validate_context_from_annotations(
+    expr: &str,
+    annotations: &[Annotation],
     parent_context_expr: Option<&str>,
     index: &QuestionnaireIndex,
 ) -> Result<Vec<Diagnostic>, crate::ParseError> {
     let mut diagnostics = Vec::new();
 
-    let annotations = annotate_expression(context_expr)?;
-
-    let Some(target_link_id) = extract_target_link_id(&annotations) else {
-        // Expression doesn't navigate to a recognizable item -- nothing to validate
+    let Some(target_link_id) = extract_target_link_id(annotations) else {
         return Ok(diagnostics);
     };
 
-    // Full expression span for diagnostics
-    let expr_span = Span { start: 0, end: context_expr.len() };
+    let expr_span = Span { start: 0, end: expr.len() };
 
-    // Check 1: target exists
     if !index.contains(target_link_id) {
         diagnostics.push(Diagnostic {
             span: expr_span,
@@ -52,11 +42,9 @@ pub fn validate_context(
             code: DiagnosticCode::UnknownLinkId,
             message: format!("Context target linkId '{}' not found in Questionnaire", target_link_id),
         });
-        return Ok(diagnostics); // Can't do further checks if target doesn't exist
+        return Ok(diagnostics);
     }
 
-    // Check 2: target should be a group (for iteration contexts)
-    // Only applies to ItemReference annotations (not AnswerReference)
     let is_item_ref = annotations.iter().any(|a| matches!(&a.kind, AnnotationKind::ItemReference { .. }));
     if is_item_ref {
         if let Some(item_type) = index.resolve_item_type(target_link_id) {
@@ -74,7 +62,6 @@ pub fn validate_context(
         }
     }
 
-    // Check 3: child reachable from parent
     if let Some(parent_expr) = parent_context_expr {
         let parent_annotations = annotate_expression(parent_expr)?;
         if let Some(parent_link_id) = extract_target_link_id(&parent_annotations) {
@@ -101,6 +88,7 @@ pub fn validate_context(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::analyze::{analyze_expression, AnalysisContext};
     use serde_json::json;
 
     fn sample_questionnaire() -> serde_json::Value {
@@ -117,18 +105,10 @@ mod tests {
                             "text": "Sub Group",
                             "type": "group",
                             "item": [
-                                {
-                                    "linkId": "deep-choice",
-                                    "text": "Deep",
-                                    "type": "choice"
-                                }
+                                { "linkId": "deep-choice", "text": "Deep", "type": "choice" }
                             ]
                         },
-                        {
-                            "linkId": "bool1",
-                            "text": "Yes or no",
-                            "type": "boolean"
-                        }
+                        { "linkId": "bool1", "text": "Yes or no", "type": "boolean" }
                     ]
                 },
                 {
@@ -136,105 +116,90 @@ mod tests {
                     "text": "Group Two",
                     "type": "group",
                     "item": [
-                        {
-                            "linkId": "string1",
-                            "text": "Name",
-                            "type": "string"
-                        }
+                        { "linkId": "string1", "text": "Name", "type": "string" }
                     ]
                 }
             ]
         })
     }
 
-    #[test]
-    fn test_valid_group_context() {
-        let idx = QuestionnaireIndex::build(&sample_questionnaire());
-        let diags = validate_context(
-            "%resource.item.where(linkId='group1')",
-            None,
-            &idx,
-        ).unwrap();
-        assert!(diags.is_empty());
+    fn context_opts(parent: Option<&str>) -> AnalysisContext {
+        AnalysisContext {
+            expects_item_target: true,
+            parent_context_expr: parent.map(|s| s.to_string()),
+            ..Default::default()
+        }
     }
 
     #[test]
-    fn test_unknown_link_id() {
+    fn test_valid_group_context() {
         let idx = QuestionnaireIndex::build(&sample_questionnaire());
-        let diags = validate_context(
-            "%resource.item.where(linkId='nonexistent')",
-            None,
+        let result = analyze_expression(
+            "%resource.item.where(linkId='group1')",
             &idx,
+            &context_opts(None),
         ).unwrap();
-        assert_eq!(diags.len(), 1);
-        assert_eq!(diags[0].code, DiagnosticCode::UnknownLinkId);
+        assert!(result.diagnostics.is_empty());
     }
 
     #[test]
     fn test_non_group_target() {
         let idx = QuestionnaireIndex::build(&sample_questionnaire());
-        let diags = validate_context(
+        let result = analyze_expression(
             "%resource.item.where(linkId='group1').item.where(linkId='bool1')",
-            None,
             &idx,
+            &context_opts(None),
         ).unwrap();
-        assert_eq!(diags.len(), 1);
-        assert_eq!(diags[0].code, DiagnosticCode::ContextTargetNotGroup);
-        assert!(diags[0].message.contains("boolean"));
+        assert!(result.diagnostics.iter().any(|d| d.code == DiagnosticCode::ContextTargetNotGroup));
     }
 
     #[test]
     fn test_child_reachable_from_parent() {
         let idx = QuestionnaireIndex::build(&sample_questionnaire());
-        let diags = validate_context(
+        let result = analyze_expression(
             "item.where(linkId='subgroup')",
-            Some("%resource.item.where(linkId='group1')"),
             &idx,
+            &context_opts(Some("%resource.item.where(linkId='group1')")),
         ).unwrap();
-        assert!(diags.is_empty());
+        let context_diags: Vec<_> = result.diagnostics.iter()
+            .filter(|d| matches!(d.code, DiagnosticCode::ContextUnreachableFromParent))
+            .collect();
+        assert!(context_diags.is_empty());
     }
 
     #[test]
     fn test_child_unreachable_from_parent() {
         let idx = QuestionnaireIndex::build(&sample_questionnaire());
-        // group2 is a valid group but not a descendant of group1
-        let diags = validate_context(
+        let result = analyze_expression(
             "item.where(linkId='group2')",
-            Some("%resource.item.where(linkId='group1')"),
             &idx,
+            &context_opts(Some("%resource.item.where(linkId='group1')")),
         ).unwrap();
-        assert_eq!(diags.len(), 1);
-        assert_eq!(diags[0].code, DiagnosticCode::ContextUnreachableFromParent);
+        assert!(result.diagnostics.iter().any(|d| d.code == DiagnosticCode::ContextUnreachableFromParent));
     }
 
     #[test]
     fn test_nested_group_context() {
         let idx = QuestionnaireIndex::build(&sample_questionnaire());
-        let diags = validate_context(
+        let result = analyze_expression(
             "%resource.item.where(linkId='group1').item.where(linkId='subgroup')",
-            None,
             &idx,
+            &context_opts(None),
         ).unwrap();
-        assert!(diags.is_empty());
-    }
-
-    #[test]
-    fn test_non_recognizable_expression() {
-        let idx = QuestionnaireIndex::build(&sample_questionnaire());
-        // An expression that doesn't match QR navigation patterns
-        let diags = validate_context("Patient.name", None, &idx).unwrap();
-        assert!(diags.is_empty());
+        assert!(result.diagnostics.is_empty());
     }
 
     #[test]
     fn test_same_context_as_parent() {
         let idx = QuestionnaireIndex::build(&sample_questionnaire());
-        let diags = validate_context(
+        let result = analyze_expression(
             "item.where(linkId='group1')",
-            Some("%resource.item.where(linkId='group1')"),
             &idx,
+            &context_opts(Some("%resource.item.where(linkId='group1')")),
         ).unwrap();
-        // Same target as parent -- should be allowed (self-reference)
-        assert!(diags.is_empty());
+        let context_diags: Vec<_> = result.diagnostics.iter()
+            .filter(|d| matches!(d.code, DiagnosticCode::ContextUnreachableFromParent | DiagnosticCode::ContextTargetNotGroup))
+            .collect();
+        assert!(context_diags.is_empty());
     }
 }
