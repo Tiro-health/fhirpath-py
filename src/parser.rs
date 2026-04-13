@@ -2,7 +2,7 @@
 
 use crate::lexer::{Token, TokenKind};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct AstNode {
     pub node_type: &'static str,
     pub terminal_node_text: Vec<String>,

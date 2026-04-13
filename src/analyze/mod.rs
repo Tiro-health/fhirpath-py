@@ -6,13 +6,14 @@
 
 // ── Core types ──────────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct Span {
     pub start: usize,
     pub end: usize,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ValueAccessor {
     /// `.answer.value` (bare)
     Value,
@@ -22,7 +23,8 @@ pub enum ValueAccessor {
     Display,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
 pub enum AnnotationKind {
     /// Path navigating to a QR answer value.
     AnswerReference {
@@ -39,19 +41,21 @@ pub enum AnnotationKind {
     },
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct Annotation {
     pub span: Span,
     pub kind: AnnotationKind,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Severity {
     Error,
     Warning,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum DiagnosticCode {
     UnknownLinkId,
     UnreachableLinkId,
@@ -61,7 +65,7 @@ pub enum DiagnosticCode {
     ContextUnreachableFromParent,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct Diagnostic {
     pub span: Span,
     pub severity: Severity,
@@ -86,7 +90,7 @@ pub struct AnalysisContext {
 }
 
 /// Result of analyzing a FHIRPath expression.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct ExpressionAnalysis {
     pub annotations: Vec<Annotation>,
     pub diagnostics: Vec<Diagnostic>,
