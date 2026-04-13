@@ -39,8 +39,31 @@ pub struct Annotation {
     pub kind: AnnotationKind,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum Severity {
+    Error,
+    Warning,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum DiagnosticCode {
+    UnknownLinkId,
+    UnreachableLinkId,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Diagnostic {
+    pub span: Span,
+    pub severity: Severity,
+    pub code: DiagnosticCode,
+    pub message: String,
+}
+
 pub mod annotations;
 pub use annotations::annotate_expression;
 
 pub mod questionnaire_index;
 pub use questionnaire_index::QuestionnaireIndex;
+
+pub mod validate_link_ids;
+pub use validate_link_ids::validate_link_ids;
