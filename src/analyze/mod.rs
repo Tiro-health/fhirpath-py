@@ -39,8 +39,31 @@ pub struct Annotation {
     pub kind: AnnotationKind,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum Severity {
+    Error,
+    Warning,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum DiagnosticCode {
+    InvalidAccessorForType,
+    MissingAccessorForCoding,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Diagnostic {
+    pub span: Span,
+    pub severity: Severity,
+    pub code: DiagnosticCode,
+    pub message: String,
+}
+
 pub mod annotations;
 pub use annotations::annotate_expression;
 
 pub mod questionnaire_index;
 pub use questionnaire_index::QuestionnaireIndex;
+
+pub mod validate_types;
+pub use validate_types::validate_value_types;
