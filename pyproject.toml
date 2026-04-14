@@ -58,10 +58,10 @@ requires-python = ">=3.10"
 test = ["pytest>=7", "pytest-cov", "pyyaml>=5"]
 
 [project.urls]
-Homepage = "https://github.com/beda-software/fhirpath-py"
-Documentation = "https://github.com/beda-software/fhirpath-py#readme"
-Source = "https://github.com/beda-software/fhirpath-py.git"
-Changelog = "https://github.com/beda-software/fhirpath-py/blob/master/CHANGELOG.md"
+Homepage = "https://github.com/Tiro-health/fhirpath-py"
+Documentation = "https://github.com/Tiro-health/fhirpath-py#readme"
+Source = "https://github.com/Tiro-health/fhirpath-py.git"
+Changelog = "https://github.com/Tiro-health/fhirpath-py/blob/master/CHANGELOG.md"
 
 [tool.ruff]
 target-version = "py310"

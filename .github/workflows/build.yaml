@@ -1,4 +1,4 @@
-name: fhirpathrs
+name: fhirpath-rs
 
 on:
   - push
