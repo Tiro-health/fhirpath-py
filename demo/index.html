@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FHIRPath Completions Demo</title>
+  <link rel="icon" href="data:,">
+  <style>
+    :root {
+      --bg: #f8f9fa;
+      --surface: #fff;
+      --border: #dee2e6;
+      --text: #212529;
+      --text-secondary: #6c757d;
+      --accent: #0d6efd;
+      --accent-light: #e7f1ff;
+      --kind-value: #198754;
+      --kind-code: #6f42c1;
+      --kind-display: #fd7e14;
+      --radius: 6px;
+      --mono: "SF Mono", "Fira Code", "Fira Mono", Menlo, monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 24px;
+    }
+
+    header h1 {
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    header p {
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-top: 2px;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 24px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+
+    @media (max-width: 800px) {
+      .container { grid-template-columns: 1fr; }
+    }
+
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .panel-header {
+      padding: 10px 16px;
+      font-size: 13px;
+      font-weight: 600;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .panel-body { padding: 16px; }
+
+    textarea {
+      width: 100%;
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1.5;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px;
+      resize: vertical;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    textarea:focus, input:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-light);
+    }
+
+    #questionnaire-input { height: 300px; }
+
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      margin-bottom: 6px;
+      color: var(--text-secondary);
+    }
+
+    .context-row {
+      display: flex;
+      gap: 8px;
+      align-items: flex-end;
+    }
+
+    .context-row .field { flex: 1; }
+
+    input[type="text"] {
+      width: 100%;
+      font-family: var(--mono);
+      font-size: 13px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 8px 12px;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    .examples {
+      margin-top: 8px;
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .example-btn {
+      font-family: var(--mono);
+      font-size: 11px;
+      padding: 3px 8px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: var(--surface);
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .example-btn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: var(--accent-light);
+    }
+
+    .completions-section { margin-top: 16px; }
+
+    .completions-count {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+    }
+
+    .completions-list {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .completion-item {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 12px;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+      align-items: baseline;
+      font-size: 13px;
+      transition: background 0.1s;
+    }
+
+    .completion-item:last-child { border-bottom: none; }
+    .completion-item:hover { background: var(--accent-light); }
+
+    .completion-label {
+      font-weight: 500;
+      white-space: nowrap;
+    }
+
+    .completion-insert {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--text-secondary);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .completion-meta {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      white-space: nowrap;
+    }
+
+    .kind-badge {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 2px 6px;
+      border-radius: 3px;
+    }
+
+    .kind-value   { background: #d1e7dd; color: var(--kind-value); }
+    .kind-code    { background: #e2d9f3; color: var(--kind-code); }
+    .kind-display { background: #ffe5d0; color: var(--kind-display); }
+
+    .breadcrumb {
+      font-size: 11px;
+      color: var(--text-secondary);
+    }
+
+    .empty-state {
+      padding: 24px;
+      text-align: center;
+      color: var(--text-secondary);
+      font-size: 13px;
+    }
+
+    .error-msg {
+      padding: 12px;
+      background: #f8d7da;
+      color: #842029;
+      border-radius: var(--radius);
+      font-size: 13px;
+      font-family: var(--mono);
+    }
+
+    .status {
+      font-size: 12px;
+      padding: 4px 8px;
+      border-radius: 4px;
+    }
+
+    .status-ok { background: #d1e7dd; color: var(--kind-value); }
+    .status-error { background: #f8d7da; color: #842029; }
+    .status-loading { background: #fff3cd; color: #664d03; }
+
+    .tree {
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1.8;
+      max-height: 300px;
+      overflow-y: auto;
+      padding: 12px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+    }
+
+    .tree-item { padding-left: 20px; }
+    .tree-link-id { color: var(--accent); }
+    .tree-type { color: var(--text-secondary); font-size: 11px; }
+    .tree-text { color: var(--text); }
+
+    .full-width { grid-column: 1 / -1; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>FHIRPath Completions Demo</h1>
+    <p>Interactive explorer for the <code>generate_completions</code> API &mdash; type a context expression to see valid FHIRPath paths.</p>
+  </header>
+
+  <div class="container">
+    <!-- Left: Questionnaire input -->
+    <div class="panel">
+      <div class="panel-header">
+        <span>Questionnaire JSON</span>
+        <span id="q-status" class="status status-loading">loading...</span>
+      </div>
+      <div class="panel-body">
+        <textarea id="questionnaire-input" spellcheck="false"></textarea>
+        <div id="tree-container" style="margin-top: 12px;">
+          <label>Item tree</label>
+          <div id="tree" class="tree"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: Context + completions -->
+    <div class="panel">
+      <div class="panel-header">
+        <span>Completions</span>
+        <span id="completion-count" class="completions-count"></span>
+      </div>
+      <div class="panel-body">
+        <div class="context-row">
+          <div class="field">
+            <label for="context-input">Context expression</label>
+            <input type="text" id="context-input" placeholder="item.where(linkId='...')" />
+          </div>
+        </div>
+        <div class="examples">
+          <button class="example-btn" data-expr="item.where(linkId='group1')">group1</button>
+          <button class="example-btn" data-expr="item.where(linkId='coding-with-children')">coding-with-children</button>
+          <button class="example-btn" data-expr="item.where(linkId='coding-with-children').answer">...answer</button>
+          <button class="example-btn" data-expr="%resource.item.where(linkId='group1')">%resource...</button>
+        </div>
+        <div class="completions-section">
+          <div id="completions-output"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import init, { QuestionnaireIndex } from "../wasm/pkg/_rust.js";
+
+    const DEFAULT_QUESTIONNAIRE = {
+      resourceType: "Questionnaire",
+      item: [
+        {
+          linkId: "group1",
+          text: "Group One",
+          type: "group",
+          item: [
+            { linkId: "choice1", text: "Pick one", type: "choice" },
+            { linkId: "bool1", text: "Yes or no", type: "boolean" },
+            {
+              linkId: "subgroup",
+              text: "Sub Group",
+              type: "group",
+              item: [
+                { linkId: "deep-string", text: "Deep String", type: "string" },
+              ],
+            },
+            { linkId: "display1", text: "Info text", type: "display" },
+          ],
+        },
+        {
+          linkId: "coding-with-children",
+          text: "Resectie",
+          type: "coding",
+          item: [
+            { linkId: "child-coding", text: "Biopten", type: "coding" },
+            { linkId: "child-bool", text: "Nabloeding", type: "boolean" },
+          ],
+        },
+      ],
+    };
+
+    const qInput = document.getElementById("questionnaire-input");
+    const contextInput = document.getElementById("context-input");
+    const output = document.getElementById("completions-output");
+    const qStatus = document.getElementById("q-status");
+    const countEl = document.getElementById("completion-count");
+    const treeEl = document.getElementById("tree");
+
+    let index = null;
+
+    function setStatus(text, type) {
+      qStatus.textContent = text;
+      qStatus.className = `status status-${type}`;
+    }
+
+    function buildIndex() {
+      try {
+        const json = qInput.value;
+        JSON.parse(json);
+        index = new QuestionnaireIndex(json);
+        setStatus("valid", "ok");
+        renderTree(json);
+        return true;
+      } catch (e) {
+        index = null;
+        setStatus("invalid", "error");
+        treeEl.innerHTML = "";
+        return false;
+      }
+    }
+
+    function renderTree(jsonStr) {
+      try {
+        const q = JSON.parse(jsonStr);
+        treeEl.innerHTML = renderItems(q.item || [], 0);
+      } catch {
+        treeEl.innerHTML = "";
+      }
+    }
+
+    function renderItems(items, depth) {
+      if (!items || items.length === 0) return "";
+      return items
+        .map((item) => {
+          const children = renderItems(item.item, depth + 1);
+          return `<div class="tree-item" style="padding-left: ${depth * 20}px">
+            <span class="tree-link-id">${esc(item.linkId)}</span>
+            <span class="tree-type">${esc(item.type)}</span>
+            ${item.text ? `<span class="tree-text">&mdash; ${esc(item.text)}</span>` : ""}
+          </div>${children}`;
+        })
+        .join("");
+    }
+
+    function esc(s) {
+      const el = document.createElement("span");
+      el.textContent = s || "";
+      return el.innerHTML;
+    }
+
+    function updateCompletions() {
+      const expr = contextInput.value.trim();
+      if (!index || !expr) {
+        output.innerHTML = `<div class="empty-state">Enter a context expression above.</div>`;
+        countEl.textContent = "";
+        return;
+      }
+
+      try {
+        const items = index.generate_completions(expr);
+
+        if (items.length === 0) {
+          output.innerHTML = `<div class="empty-state">No completions for this context.</div>`;
+          countEl.textContent = "0 items";
+          return;
+        }
+
+        countEl.textContent = `${items.length} item${items.length !== 1 ? "s" : ""}`;
+        output.innerHTML = `<div class="completions-list">${items.map(renderItem).join("")}</div>`;
+      } catch (e) {
+        output.innerHTML = `<div class="error-msg">${esc(e.message || String(e))}</div>`;
+        countEl.textContent = "";
+      }
+    }
+
+    function renderItem(item) {
+      return `<div class="completion-item">
+        <span class="completion-label">${esc(item.label)}</span>
+        <span class="completion-insert" title="${esc(item.insert_text)}">${esc(item.insert_text)}</span>
+        <span class="completion-meta">
+          ${item.detail ? `<span class="breadcrumb">${esc(item.detail)}</span>` : ""}
+          <span class="kind-badge kind-${item.kind}">${item.kind}</span>
+        </span>
+      </div>`;
+    }
+
+    let debounceTimer;
+    function debounce(fn, ms) {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(fn, ms);
+    }
+
+    qInput.addEventListener("input", () => debounce(() => { buildIndex(); updateCompletions(); }, 300));
+    contextInput.addEventListener("input", () => debounce(updateCompletions, 100));
+
+    document.querySelectorAll(".example-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        contextInput.value = btn.dataset.expr;
+        updateCompletions();
+      });
+    });
+
+    await init();
+    qInput.value = JSON.stringify(DEFAULT_QUESTIONNAIRE, null, 2);
+    buildIndex();
+    contextInput.value = "item.where(linkId='group1')";
+    updateCompletions();
+  </script>
+</body>
+</html>

@@ -41,9 +41,19 @@ export function parse(expr: string): object;
 /** Annotate a FHIRPath expression, extracting answer/item references and coded values. */
 export function annotate_expression(expr: string): Annotation[];
 
+export interface CompletionItem {
+  label: string;
+  detail: string | null;
+  insert_text: string;
+  filter_text: string;
+  sort_text: string;
+  kind: "value" | "code" | "display";
+}
+
 /** Index built from a FHIR Questionnaire, used for expression analysis. */
 export class QuestionnaireIndex {
   constructor(questionnaire_json: string);
+  generate_completions(context_expr: string): CompletionItem[];
 }
 
 /**
