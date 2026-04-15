@@ -2,7 +2,7 @@ import copy
 
 import pytest
 
-from fhirpathpy import evaluate
+from fhirpathrs import evaluate
 
 
 @pytest.mark.parametrize(
