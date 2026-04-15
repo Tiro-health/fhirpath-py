@@ -6,6 +6,7 @@ from fhirpathrs.engine.nodes import FP_Type, ResourceNode
 from fhirpathrs._rust import (
     annotate_expression,
     analyze_expression,
+    resolve_context,
     QuestionnaireIndex,
 )
 

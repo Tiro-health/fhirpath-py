@@ -2,6 +2,7 @@ pub mod analyze;
 pub mod bindings;
 pub mod lexer;
 pub mod parser;
+pub mod resolve;
 
 pub use lexer::{Token, TokenKind};
 pub use parser::AstNode;
