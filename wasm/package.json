@@ -1,6 +1,6 @@
 {
   "name": "@tiro-health/fhirpath-wasm",
-  "version": "0.1.0",
+  "version": "0.0.0-placeholder",
   "description": "FHIRPath parser and SDC expression analyzer compiled to WebAssembly",
   "license": "MIT",
   "repository": {

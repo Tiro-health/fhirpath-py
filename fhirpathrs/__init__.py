@@ -9,13 +9,13 @@ from fhirpathrs._rust import (
     QuestionnaireIndex,
 )
 
+from importlib.metadata import version as _get_version
+
 __title__ = "fhirpathrs"
-__version__ = "2.1.0"
+__version__ = _get_version("fhirpathrs")
 __author__ = "beda.software"
 __license__ = "MIT"
-__copyright__ = "Copyright 2025 beda.software"
 
-# Version synonym
 VERSION = __version__
 
 
