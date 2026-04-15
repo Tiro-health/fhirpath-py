@@ -1,77 +1,38 @@
 {
-  "children": [
-    {
-      "type": "AdditiveExpression",
-      "start": 0,
-      "end": 4,
-      "terminalNodeText": [
-        "+"
-      ],
-      "children": [
-        {
-          "type": "TermExpression",
-          "start": 0,
-          "end": 2,
-          "terminalNodeText": [],
-          "text": "%v",
-          "children": [
-            {
-              "type": "ExternalConstantTerm",
-              "start": 0,
-              "end": 2,
-              "terminalNodeText": [],
-              "children": [
-                {
-                  "type": "ExternalConstant",
-                  "start": 0,
-                  "end": 2,
-                  "terminalNodeText": [
-                    "%"
-                  ],
-                  "children": [
-                    {
-                      "type": "Identifier",
-                      "start": 1,
-                      "end": 2,
-                      "terminalNodeText": [
-                        "v"
-                      ],
-                      "text": "v"
-                    }
-                  ]
-                }
-              ]
-            }
-          ]
-        },
-        {
-          "type": "TermExpression",
-          "start": 3,
-          "end": 4,
-          "terminalNodeText": [],
+  "children": [{
+    "type": "AdditiveExpression",
+    "terminalNodeText": ["+"],
+    "children": [{
+      "type": "TermExpression",
+      "text": "%v",
+      "terminalNodeText": [],
+      "children": [{
+        "type": "ExternalConstantTerm",
+        "terminalNodeText": [],
+        "children": [{
+          "type": "ExternalConstant",
+          "terminalNodeText": ["%"],
+          "children": [{
+            "type": "Identifier",
+            "text": "v",
+            "terminalNodeText": ["v"]
+          }]
+        }]
+      }]
+    }, {
+      "type": "TermExpression",
+      "text": "2",
+      "terminalNodeText": [],
+      "children": [{
+        "type": "LiteralTerm",
+        "text": "2",
+        "terminalNodeText": [],
+        "children": [{
+          "type": "NumberLiteral",
           "text": "2",
-          "children": [
-            {
-              "type": "LiteralTerm",
-              "start": 3,
-              "end": 4,
-              "terminalNodeText": [],
-              "text": "2",
-              "children": [
-                {
-                  "type": "NumberLiteral",
-                  "start": 3,
-                  "end": 4,
-                  "terminalNodeText": [
-                    "2"
-                  ],
-                  "text": "2"
-                }
-              ]
-            }
-          ]
-        }
-      ]
-    }
-  ]
+          "terminalNodeText": ["2"]
+        }]
+      }]
+    }]
+  }]
 }

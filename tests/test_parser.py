@@ -2,24 +2,24 @@ import json
 from pathlib import Path
 
 import pytest
+from antlr4.error.Errors import LexerNoViableAltException
 
-from fhirpathrs.parser import parse
+from fhirpathpy.parser import parse
 
-ast_fixtures_path = Path(__file__).resolve().parent / "fixtures" / "ast"
+ast_fixtures_path = Path(__file__).resolve().parent.joinpath("fixtures").joinpath("ast")
 
 
 def load_ast_fixture(fixture_name):
-    fixture_path = ast_fixtures_path / (fixture_name + ".json")
+    fixture_path = ast_fixtures_path.joinpath(fixture_name + ".json")
     with open(fixture_path) as f:
         return json.load(f)
 
 
-def load_golden_asts():
-    with open(ast_fixtures_path / "golden_asts.json") as f:
-        return json.load(f)
+def are_ast_equal(first_ast, second_ast):
+    first_string = json.dumps(first_ast, sort_keys=True)
+    second_string = json.dumps(second_ast, sort_keys=True)
 
-
-GOLDEN_ASTS = load_golden_asts()
+    return first_string == second_string
 
 
 @pytest.mark.parametrize(
@@ -39,7 +39,7 @@ def parse_valid_test(expression):
 
 
 def parse_non_valid_test():
-    with pytest.raises(SyntaxError):
+    with pytest.raises(LexerNoViableAltException):
         parse("!")
 
 
@@ -53,14 +53,4 @@ def parse_non_valid_test():
     ],
 )
 def output_correct_ast_test(expression):
-    expected = load_ast_fixture(expression)
-    assert json.dumps(parse(expression), sort_keys=True) == json.dumps(expected, sort_keys=True)
-
-
-@pytest.mark.parametrize("expression", list(GOLDEN_ASTS.keys()))
-def golden_ast_test(expression):
-    expected = GOLDEN_ASTS[expression]
-    actual = parse(expression)
-    assert json.dumps(actual, sort_keys=True) == json.dumps(expected, sort_keys=True), (
-        f"AST mismatch for {expression!r}"
-    )
+    assert are_ast_equal(parse(expression), load_ast_fixture(expression))

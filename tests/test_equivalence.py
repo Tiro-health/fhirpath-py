@@ -2,7 +2,7 @@ from decimal import Decimal
 
 import pytest
 
-from fhirpathrs.engine.invocations.equality import (
+from fhirpathpy.engine.invocations.equality import (
     decimal_places,
     is_equivalent,
     normalize_string,

@@ -1,20 +1,22 @@
-fhirpathrs
-==========
+fhirpath.py
+===========
 
 [![Build Status](https://github.com/beda-software/fhirpath-py/actions/workflows/build.yaml/badge.svg)](https://github.com/beda-software/fhirpath-py/actions)
 [![codecov](https://codecov.io/gh/beda-software/fhirpath-py/branch/master/graph/badge.svg)](https://codecov.io/gh/beda-software/fhirpath-py)
-[![pypi](https://img.shields.io/pypi/v/fhirpathrs.svg)](https://pypi.org/project/fhirpathrs/)
-[![Supported Python version](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/release/python-3100/)
+[![pypi](https://img.shields.io/pypi/v/fhirpathpy.svg)](https://pypi.org/project/fhirpathpy/)
+[![Supported Python version](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/release/python-380/)
 
-[FHIRPath](https://www.hl7.org/fhir/fhirpath.html) implementation in Python with a Rust-based parser
+[FHIRPath](https://www.hl7.org/fhir/fhirpath.html) implementation in Python
+
+Parser was generated with [antlr4](https://github.com/antlr/antlr4)
 
 # Getting started
 ## Install
-`pip install fhirpathrs`
+`pip install fhirpathpy`
 
 ## Usage
 ```Python
-from fhirpathrs import evaluate
+from fhirpathpy import evaluate
 
 patient = {
   "resourceType": "Patient",
@@ -85,11 +87,11 @@ options.userInvocationTable - a user invocation table used to replace any existi
 
 ## Using data models
 
-The fhirpathrs library comes with pre-defined data models for FHIR versions DSTU2, STU3, R4, and R5. These models can be used within your project.
+The fhirpathpy library comes with pre-defined data models for FHIR versions DSTU2, STU3, R4, and R5. These models can be used within your project.
 
 Example:
 ```python
-from fhirpathrs.models import models
+from fhirpathpy.models import models
 
 
 r4_model = models["r4"]
@@ -129,24 +131,8 @@ result = evaluate(
 It works similarly to [fhirpath.js](https://github.com/HL7/fhirpath.js/tree/master?tab=readme-ov-file#user-defined-functions)
 
 
-## Migrating from fhirpathpy
-
-`fhirpathrs` is a drop-in replacement for `fhirpathpy`. Simply update your imports:
-
-```diff
-- from fhirpathpy import compile, evaluate
-+ from fhirpathrs import compile, evaluate
-```
-
-If you depend on third-party libraries that still import `fhirpathpy`, you can register `fhirpathrs` as an alias. Call this early in your application (e.g. in your entrypoint or `conftest.py`), **before** any `fhirpathpy` imports:
-
-```python
-import fhirpathrs
-fhirpathrs.register_as_fhirpathpy()
-
-# Any subsequent `from fhirpathpy import ...` will resolve to fhirpathrs
-```
-
 ## Development
 
-To run tests: `uv run pytest`
+To activate git pre-commit hook: `autohooks activate`
+
+To run tests: `pytest`

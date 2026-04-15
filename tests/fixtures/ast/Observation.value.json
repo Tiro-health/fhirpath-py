@@ -1,66 +1,33 @@
 {
-  "children": [
-    {
-      "type": "InvocationExpression",
-      "start": 0,
-      "end": 17,
-      "terminalNodeText": [
-        "."
-      ],
-      "text": "Observation.value",
-      "children": [
-        {
-          "type": "TermExpression",
-          "start": 0,
-          "end": 11,
-          "terminalNodeText": [],
-          "text": "Observation",
-          "children": [
-            {
-              "type": "InvocationTerm",
-              "start": 0,
-              "end": 11,
-              "terminalNodeText": [],
-              "children": [
-                {
-                  "type": "MemberInvocation",
-                  "start": 0,
-                  "end": 11,
-                  "terminalNodeText": [],
-                  "children": [
-                    {
-                      "type": "Identifier",
-                      "start": 0,
-                      "end": 11,
-                      "terminalNodeText": [
-                        "Observation"
-                      ],
-                      "text": "Observation"
-                    }
-                  ]
-                }
-              ]
-            }
-          ]
-        },
-        {
+  "children": [{
+    "type": "InvocationExpression",
+    "text": "Observation.value",
+    "terminalNodeText": ["."],
+    "children": [{
+      "type": "TermExpression",
+      "text": "Observation",
+      "terminalNodeText": [],
+      "children": [{
+        "type": "InvocationTerm",
+        "terminalNodeText": [],
+        "children": [{
           "type": "MemberInvocation",
-          "start": 12,
-          "end": 17,
           "terminalNodeText": [],
-          "children": [
-            {
-              "type": "Identifier",
-              "start": 12,
-              "end": 17,
-              "terminalNodeText": [
-                "value"
-              ],
-              "text": "value"
-            }
-          ]
-        }
-      ]
-    }
-  ]
+          "children": [{
+            "type": "Identifier",
+            "text": "Observation",
+            "terminalNodeText": ["Observation"]
+          }]
+        }]
+      }]
+    }, {
+      "type": "MemberInvocation",
+      "terminalNodeText": [],
+      "children": [{
+        "type": "Identifier",
+        "text": "value",
+        "terminalNodeText": ["value"]
+      }]
+    }]
+  }]
 }
