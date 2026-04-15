@@ -46,6 +46,16 @@ impl QuestionnaireIndex {
     }
 }
 
+/// Resolve `%context` references in a FHIRPath expression at the AST level.
+///
+/// Parses both expressions, replaces every `%context` reference in `expr`
+/// with the parsed `base_expr` AST, and returns the serialized result.
+/// Returns `expr` unchanged when no `%context` reference exists.
+#[wasm_bindgen]
+pub fn resolve_context(expr: &str, base_expr: &str) -> Result<String, JsError> {
+    crate::resolve::resolve_context(expr, base_expr).map_err(|e| JsError::new(&e.0))
+}
+
 /// Analyze a FHIRPath expression in the context of a Questionnaire.
 ///
 /// Returns `{ annotations: Annotation[], diagnostics: Diagnostic[] }`.

@@ -198,6 +198,18 @@ fn annotate_expression(py: Python<'_>, expr: &str) -> PyResult<PyObject> {
     Ok(PyList::new(py, result)?.into())
 }
 
+/// Resolve `%context` references in a FHIRPath expression at the AST level.
+///
+/// Parses both expressions, replaces every `%context` reference in `expr`
+/// with the parsed `base_expr` AST, and returns the serialized result.
+/// Returns `expr` unchanged when no `%context` reference exists.
+/// Raises `SyntaxError` if either expression fails to parse.
+#[pyfunction]
+fn resolve_context(expr: &str, base_expr: &str) -> PyResult<String> {
+    crate::resolve::resolve_context(expr, base_expr)
+        .map_err(|e| pyo3::exceptions::PySyntaxError::new_err(e.0))
+}
+
 /// Analyze a FHIRPath expression against a QuestionnaireIndex, returning
 /// annotations and diagnostics.
 #[pyfunction]
@@ -240,6 +252,7 @@ pub fn _rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyQuestionnaireIndex>()?;
     m.add_function(wrap_pyfunction!(annotate_expression, m)?)?;
     m.add_function(wrap_pyfunction!(analyze_expression, m)?)?;
+    m.add_function(wrap_pyfunction!(resolve_context, m)?)?;
     Ok(())
 }
 
