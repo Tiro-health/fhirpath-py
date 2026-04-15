@@ -1,103 +1,51 @@
 {
-  "children": [
-    {
-      "type": "AdditiveExpression",
-      "start": 0,
-      "end": 5,
-      "terminalNodeText": [
-        "+"
-      ],
-      "children": [
-        {
-          "type": "InvocationExpression",
-          "start": 0,
-          "end": 3,
-          "terminalNodeText": [
-            "."
-          ],
-          "text": "a.b",
-          "children": [
-            {
-              "type": "TermExpression",
-              "start": 0,
-              "end": 1,
-              "terminalNodeText": [],
-              "text": "a",
-              "children": [
-                {
-                  "type": "InvocationTerm",
-                  "start": 0,
-                  "end": 1,
-                  "terminalNodeText": [],
-                  "children": [
-                    {
-                      "type": "MemberInvocation",
-                      "start": 0,
-                      "end": 1,
-                      "terminalNodeText": [],
-                      "children": [
-                        {
-                          "type": "Identifier",
-                          "start": 0,
-                          "end": 1,
-                          "terminalNodeText": [
-                            "a"
-                          ],
-                          "text": "a"
-                        }
-                      ]
-                    }
-                  ]
-                }
-              ]
-            },
-            {
-              "type": "MemberInvocation",
-              "start": 2,
-              "end": 3,
-              "terminalNodeText": [],
-              "children": [
-                {
-                  "type": "Identifier",
-                  "start": 2,
-                  "end": 3,
-                  "terminalNodeText": [
-                    "b"
-                  ],
-                  "text": "b"
-                }
-              ]
-            }
-          ]
-        },
-        {
-          "type": "TermExpression",
-          "start": 4,
-          "end": 5,
+  "children": [{
+    "type": "AdditiveExpression",
+    "terminalNodeText": ["+"],
+    "children": [{
+      "type": "InvocationExpression",
+      "text": "a.b",
+      "terminalNodeText": ["."],
+      "children": [{
+        "type": "TermExpression",
+        "text": "a",
+        "terminalNodeText": [],
+        "children": [{
+          "type": "InvocationTerm",
           "terminalNodeText": [],
+          "children": [{
+            "type": "MemberInvocation",
+            "terminalNodeText": [],
+            "children": [{
+              "type": "Identifier",
+              "text": "a",
+              "terminalNodeText": ["a"]
+            }]
+          }]
+        }]
+      }, {
+        "type": "MemberInvocation",
+        "terminalNodeText": [],
+        "children": [{
+          "type": "Identifier",
+          "text": "b",
+          "terminalNodeText": ["b"]
+        }]
+      }]
+    }, {
+      "type": "TermExpression",
+      "text": "2",
+      "terminalNodeText": [],
+      "children": [{
+        "type": "LiteralTerm",
+        "text": "2",
+        "terminalNodeText": [],
+        "children": [{
+          "type": "NumberLiteral",
           "text": "2",
-          "children": [
-            {
-              "type": "LiteralTerm",
-              "start": 4,
-              "end": 5,
-              "terminalNodeText": [],
-              "text": "2",
-              "children": [
-                {
-                  "type": "NumberLiteral",
-                  "start": 4,
-                  "end": 5,
-                  "terminalNodeText": [
-                    "2"
-                  ],
-                  "text": "2"
-                }
-              ]
-            }
-          ]
-        }
-      ]
-    }
-  ]
+          "terminalNodeText": ["2"]
+        }]
+      }]
+    }]
+  }]
 }

@@ -1,4 +1,4 @@
-name: fhirpath-rs
+name: fhirpath py
 
 on:
   - push
@@ -10,57 +10,31 @@ jobs:
     strategy:
       matrix:
         include:
+          - python-version: 3.9
           - python-version: "3.10"
           - python-version: "3.11"
           - python-version: "3.12"
-          - python-version: "3.13"
     env:
       PYTHON: ${{ matrix.python-version }}
     steps:
-    - uses: actions/checkout@v4
-    - name: Install Rust toolchain
-      uses: dtolnay/rust-toolchain@stable
-    - name: Install uv
-      uses: astral-sh/setup-uv@v4
-      with:
-        version: "latest"
+    - uses: actions/checkout@v3
     - name: Set up Python ${{ matrix.python-version }}
-      run: uv python install ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Upgrade pip and pipenv
+      run: python -m pip install --upgrade pip pipenv
     - name: Install dependencies
-      run: uv sync --extra test
-    - name: Run Rust tests
-      run: cargo test --no-default-features
-    - name: Run Python tests
-      run: uv run pytest
+      run: pipenv install --dev
+    - name: Run tests
+      run: pipenv run pytest
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v4
+      uses: codecov/codecov-action@v3
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
         env_vars: PYTHON
-        fail_ci_if_error: false
+        fail_ci_if_error: true
         files: ./coverage.xml
         flags: unittests
         name: codecov-umbrella
         verbose: true
-
-  wasm:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    - name: Install Rust toolchain
-      uses: dtolnay/rust-toolchain@stable
-      with:
-        targets: wasm32-unknown-unknown
-    - name: Install wasm-pack
-      run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-    - name: Build WASM
-      run: wasm-pack build --target web --features wasm --no-default-features
-    - name: Overlay custom package metadata and types
-      run: |
-        cp wasm/package.json pkg/package.json
-        cp wasm/fhirpath_wasm.d.ts pkg/fhirpath_wasm.d.ts
-    - name: Upload WASM artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: wasm-pkg
-        path: pkg/

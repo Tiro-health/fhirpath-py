@@ -1,9 +1,9 @@
 import pytest
 import yaml
 
-from fhirpathrs import evaluate
-from fhirpathrs.engine.nodes import FP_Quantity
-from fhirpathrs.models import models
+from fhirpathpy import evaluate
+from fhirpathpy.engine.nodes import FP_Quantity
+from fhirpathpy.models import models
 from tests.resources import resources
 
 

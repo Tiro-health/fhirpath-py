@@ -71,11 +71,8 @@ instance/
 # Sphinx documentation
 docs/_build/
 
-# Rust / Cargo build artifacts
+# PyBuilder
 target/
-
-# wasm-pack build output
-pkg/
 
 # Jupyter Notebook
 .ipynb_checkpoints
