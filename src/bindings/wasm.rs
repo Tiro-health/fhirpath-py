@@ -44,6 +44,13 @@ impl QuestionnaireIndex {
             inner: analyze::QuestionnaireIndex::build(&value),
         })
     }
+
+    /// Generate completion items for autocomplete given a context expression.
+    pub fn generate_completions(&self, context_expr: &str) -> Result<JsValue, JsError> {
+        let items = analyze::generate_completions(&self.inner, context_expr)
+            .map_err(|e| JsError::new(&e.to_string()))?;
+        serde_wasm_bindgen::to_value(&items).map_err(|e| JsError::new(&e.to_string()))
+    }
 }
 
 /// Analyze a FHIRPath expression in the context of a Questionnaire.

@@ -142,6 +142,7 @@ pub fn analyze_expression(
 // ── Internal modules ────────────────────────────────────────────────────
 
 pub mod annotations;
+pub mod completions;
 pub mod questionnaire_index;
 
 pub(crate) mod validate_context;
@@ -151,6 +152,7 @@ pub(crate) mod validate_types;
 // ── Convenience re-exports ──────────────────────────────────────────────
 
 pub use annotations::annotate_expression;
+pub use completions::{generate_completions, CompletionItem, CompletionItemKind};
 pub use questionnaire_index::QuestionnaireIndex;
 
 #[cfg(test)]
