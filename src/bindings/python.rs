@@ -111,6 +111,40 @@ impl PyQuestionnaireIndex {
     fn contains(&self, link_id: &str) -> bool {
         self.inner.contains(link_id)
     }
+
+    fn generate_completions(&self, py: Python<'_>, context_expr: &str) -> PyResult<PyObject> {
+        let items = analyze::generate_completions(&self.inner, context_expr)
+            .map_err(|e| pyo3::exceptions::PySyntaxError::new_err(e.0))?;
+        let result: Vec<PyObject> = items
+            .iter()
+            .map(|item| completion_item_to_pydict(py, item))
+            .collect::<PyResult<Vec<_>>>()?;
+        Ok(PyList::new(py, result)?.into())
+    }
+}
+
+// ── Completion helpers ────────────────────────────────────────────────
+
+fn completion_kind_to_str(kind: &analyze::CompletionItemKind) -> &'static str {
+    match kind {
+        analyze::CompletionItemKind::Value => "value",
+        analyze::CompletionItemKind::Code => "code",
+        analyze::CompletionItemKind::Display => "display",
+    }
+}
+
+fn completion_item_to_pydict(py: Python<'_>, item: &analyze::CompletionItem) -> PyResult<PyObject> {
+    let dict = PyDict::new(py);
+    dict.set_item("label", item.label.as_str())?;
+    match &item.detail {
+        Some(d) => dict.set_item("detail", d.as_str())?,
+        None => dict.set_item("detail", py.None())?,
+    }
+    dict.set_item("insert_text", item.insert_text.as_str())?;
+    dict.set_item("filter_text", item.filter_text.as_str())?;
+    dict.set_item("sort_text", item.sort_text.as_str())?;
+    dict.set_item("kind", completion_kind_to_str(&item.kind))?;
+    Ok(dict.into())
 }
 
 // ── Annotation / analysis helpers ──────────────────────────────────────
