@@ -1,0 +1,57 @@
+name: Deploy demo to GitHub Pages
+
+on:
+  push:
+    branches: [axelv/rust-parser-v2]
+    paths:
+      - "demo/**"
+      - "src/**"
+      - "wasm/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/pages.yaml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+      - name: Build WASM
+        run: wasm-pack build --target web --features wasm --no-default-features
+      - name: Assemble site
+        run: |
+          mkdir -p _site/demo _site/wasm/pkg
+          cp demo/index.html _site/demo/index.html
+          cp pkg/_rust_bg.wasm _site/wasm/pkg/
+          cp pkg/_rust.js _site/wasm/pkg/
+          cp pkg/_rust.d.ts _site/wasm/pkg/
+          cp wasm/fhirpath_wasm.d.ts _site/wasm/pkg/
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
