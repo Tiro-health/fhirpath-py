@@ -2,7 +2,78 @@
 ///
 /// Provides semantic annotations and diagnostics for any FHIRPath expression
 /// that runs against a QuestionnaireResponse — templateExtractContext,
-/// templateExtractValue, calculatedExpression, answerExpression, enableWhenExpression, etc.
+/// templateExtractValue, calculatedExpression, answerExpression,
+/// enableWhenExpression, etc.
+///
+/// ## Architecture
+///
+/// ```text
+///              ┌─────────────────────────────────────────────────────┐
+///              │                    analyze_expression                │  <- orchestrator
+///              │    (expr, &QuestionnaireIndex, &AnalysisContext)    │
+///              │                  → ExpressionAnalysis                │
+///              └─────────┬─────────────────────────────────┬─────────┘
+///                        │                                 │
+///                        ▼                                 ▼
+///           ┌────────────────────────┐       ┌──────────────────────────┐
+///           │      annotations       │       │        validators        │
+///           │   (index-agnostic)     │       │      (index-aware)       │
+///           │                        │       │                          │
+///           │   expr → AST → chain   │──────▶│  validate_link_ids       │
+///           │   steps → state        │  ann  │  validate_types          │
+///           │   machine → Vec<Ann>   │       │  validate_context        │
+///           │         + Vec<Diag>    │       │       → Vec<Diagnostic>  │
+///           └────────────────────────┘       └──────────────────────────┘
+///
+///           ┌────────────────────────┐       ┌──────────────────────────┐
+///           │      completions       │       │         resolve          │
+///           │  expr + index → items  │       │   expr + base → expr'    │
+///           │   (separate entrypt)   │       │ (%context substitution)  │
+///           └────────────────────────┘       └──────────────────────────┘
+/// ```
+///
+/// ## Interfaces
+///
+/// - **Annotator** (`annotations::annotate_expression_with_diagnostics`) —
+///   purely syntactic. Decomposes each navigation chain into
+///   `ChainStep`s (see `annotations.rs`) and runs a state machine producing
+///   [`Annotation`]s (with [`Attribution`] lattice) plus any
+///   `ExpressionNotAttributable` [`Diagnostic`]s. **Never sees the
+///   [`QuestionnaireIndex`]** — keeps this layer testable in isolation
+///   and makes it safe to call from contexts without a Questionnaire.
+///
+/// - **Validators** — each takes `&[Annotation]` (and/or the raw `expr` +
+///   a reparsed AST) plus `&QuestionnaireIndex`, returns `Vec<Diagnostic>`.
+///   They don't mutate annotations; they only read them and emit extra
+///   diagnostics. Gated on [`Attribution`]: once an annotation drops to
+///   `WidenedScope` / `Unattributable`, type and reachability checks skip
+///   it because the path is no longer precisely modeled.
+///
+/// - **Orchestrator** ([`analyze_expression`]) — wires annotator + the
+///   three validators in a fixed order and merges their diagnostics. This
+///   is the primary public entry point; bindings call it directly.
+///
+/// - **Bindings** (`crate::bindings::{python, wasm}`) — thin adapters.
+///   [`Annotation`] and [`Diagnostic`] already derive `serde::Serialize`
+///   with snake_case variants; the WASM binding uses that directly, the
+///   Python binding converts manually to preserve v3.0.0 dict shapes
+///   (notably: `Attribution::Full` omits the `attribution` key).
+///
+/// ## Attribution lattice
+///
+/// Demotion is monotonic (see `Attribution::demote_to`). A chain never
+/// regains precision:
+///
+/// ```text
+///   Full ──(positional op)──▶ PartialPositional
+///    │                             │
+///    └───────(descendants / children / repeat)─────▶ WidenedScope
+///                                                         │
+///   Full ──────(iif / select / non-linkId where)──▶ Unattributable ◀─┘
+/// ```
+///
+/// Once below `PartialPositional`, linkIds collected so far are preserved
+/// in the terminal annotation but consumers should treat them as hints.
 
 // ── Core types ──────────────────────────────────────────────────────────
 

@@ -56,6 +56,7 @@ fn resolve_context(expr: &str) -> Result<Option<ContextPosition>, crate::ParseEr
                 ChainStepKind::Function {
                     name,
                     link_id: Some(id),
+                    ..
                 },
             ) if name == "where" => State::ItemFiltered(id.clone()),
             (State::ItemFiltered(_), ChainStepKind::Identifier(name)) if name == "item" => {
