@@ -331,7 +331,12 @@ enum Anchor {
     AnswerValue,
     /// Arrived at `…answer.value.<code|display>`.
     AnswerValueProp(ValueAccessor),
-    /// Left the lattice irrecoverably.
+    /// After a scope-widening operation (`descendants()`, `children()`,
+    /// `repeat()`). We're inside QR territory but no longer tracking a
+    /// structural parent-chain.
+    Widened,
+    /// Left the lattice irrecoverably — `first()` on unfiltered `item`,
+    /// unknown identifier on a navigation chain, etc.
     Unattributable,
 }
 
@@ -366,6 +371,34 @@ impl SelectionState {
     fn in_qr_scope(&self) -> bool {
         !matches!(self.anchor, Anchor::Start | Anchor::Unattributable)
     }
+
+    /// Anchors on which attribution-demoting ops should keep the anchor but
+    /// lower attribution, rather than hard-stopping to `Unattributable`.
+    fn is_attributed_anchor(&self) -> bool {
+        matches!(
+            self.anchor,
+            Anchor::FilteredItems
+                | Anchor::Answer
+                | Anchor::AnswerValue
+                | Anchor::AnswerValueProp(_)
+                | Anchor::Widened
+                | Anchor::Items
+        )
+    }
+}
+
+/// Degrade attribution for a scope-widening step (`descendants`, `children`,
+/// `repeat`). `Full` → `WidenedScope`; anything already lossy drops to
+/// `Unattributable` because we've piled loss on top of loss.
+fn widen_attribution(a: Attribution) -> Attribution {
+    match a {
+        Attribution::Full => Attribution::WidenedScope,
+        _ => Attribution::Unattributable,
+    }
+}
+
+fn is_widening_function(name: &str) -> bool {
+    matches!(name, "descendants" | "children" | "repeat")
 }
 
 /// Set of positional selector function names that narrow cardinality to one.
@@ -446,6 +479,17 @@ fn transition(mut state: SelectionState, step: &ChainStep) -> SelectionState {
         }
     }
 
+    // Widening ops on any live anchor (including Start) enter Widened scope
+    // and demote attribution. Handled ahead of the main match so they compose
+    // cleanly regardless of the current anchor.
+    if let ChainStepKind::Function { name, .. } = &step.kind {
+        if is_widening_function(name) && !matches!(state.anchor, Anchor::Unattributable) {
+            state.attribution = widen_attribution(state.attribution);
+            state.anchor = Anchor::Widened;
+            return state;
+        }
+    }
+
     let next_anchor = match (&state.anchor, &step.kind) {
         // External constants (%context, %resource, %factory...) stay at Start.
         (Anchor::Start, ChainStepKind::External) => Anchor::Start,
@@ -470,6 +514,23 @@ fn transition(mut state: SelectionState, step: &ChainStep) -> SelectionState {
             state.link_ids.push(id.clone());
             Anchor::FilteredItems
         }
+
+        // Widened + where(linkId=…) — anchor drops into FilteredItems so we
+        // can still navigate to .answer.value, but attribution stays WidenedScope.
+        (
+            Anchor::Widened,
+            ChainStepKind::Function {
+                name,
+                link_id: Some(id),
+                ..
+            },
+        ) if name == "where" => {
+            state.link_ids.push(id.clone());
+            Anchor::FilteredItems
+        }
+
+        // Widened + "item" -> Items (still carrying widened attribution).
+        (Anchor::Widened, ChainStepKind::Identifier(name)) if name == "item" => Anchor::Items,
 
         // FilteredItems / Answer -> descend through .item (nested navigation)
         (Anchor::FilteredItems, ChainStepKind::Identifier(name)) if name == "item" => Anchor::Items,
@@ -558,10 +619,25 @@ fn transition(mut state: SelectionState, step: &ChainStep) -> SelectionState {
         // Any step on Unattributable keeps us Unattributable.
         (Anchor::Unattributable, _) => Anchor::Unattributable,
 
-        // Anything else walks off the lattice. If we were inside a QR scope,
-        // signal Unattributable so the caller emits a diagnostic; if we were
-        // still at Start, the chain simply doesn't apply to us.
+        // Anything else walks off our explicit map. Two cases:
+        //
+        // - Opaque function call (`iif`, `select`, non-linkId `where`, any
+        //   unrecognized function) on an attributed anchor: demote attribution
+        //   to Unattributable but keep the anchor. A subsequent
+        //   `.where(linkId=…)` can still collect linkIds, and a terminal
+        //   `.answer.value` still produces an annotation (attribution carries
+        //   the taint so consumers know not to fully trust it).
+        //
+        // - Anything else while in QR scope: hard stop to `Anchor::Unattributable`.
+        //
+        // - Anything while still at Start: non-QR chain — reset cleanly.
         _ => {
+            if state.is_attributed_anchor()
+                && matches!(&step.kind, ChainStepKind::Function { .. })
+            {
+                state.attribution = state.attribution.demote_to(Attribution::Unattributable);
+                return state; // anchor unchanged
+            }
             if state.in_qr_scope() {
                 Anchor::Unattributable
             } else {
@@ -596,17 +672,31 @@ fn match_qr_path(steps: &[ChainStep]) -> MatchOutcome {
     }
 
     match state.anchor {
-        Anchor::AnswerValue => MatchOutcome::Annotation(MatchResult {
-            link_ids: state.link_ids,
-            kind: MatchKind::AnswerRef(ValueAccessor::Value),
-            attribution: state.attribution,
-        }),
-        Anchor::AnswerValueProp(accessor) => MatchOutcome::Annotation(MatchResult {
-            link_ids: state.link_ids,
-            kind: MatchKind::AnswerRef(accessor),
-            attribution: state.attribution,
-        }),
+        Anchor::AnswerValue if !state.link_ids.is_empty() => {
+            MatchOutcome::Annotation(MatchResult {
+                link_ids: state.link_ids,
+                kind: MatchKind::AnswerRef(ValueAccessor::Value),
+                attribution: state.attribution,
+            })
+        }
+        Anchor::AnswerValueProp(accessor) if !state.link_ids.is_empty() => {
+            MatchOutcome::Annotation(MatchResult {
+                link_ids: state.link_ids,
+                kind: MatchKind::AnswerRef(accessor),
+                attribution: state.attribution,
+            })
+        }
         Anchor::FilteredItems if !state.link_ids.is_empty() => {
+            MatchOutcome::Annotation(MatchResult {
+                link_ids: state.link_ids,
+                kind: MatchKind::ItemRef,
+                attribution: state.attribution,
+            })
+        }
+        // Widened + collected linkIds is a valid ItemRef terminal (e.g.
+        // `item.where(linkId='g').children()`). Attribution carries the
+        // widening taint.
+        Anchor::Widened if !state.link_ids.is_empty() => {
             MatchOutcome::Annotation(MatchResult {
                 link_ids: state.link_ids,
                 kind: MatchKind::ItemRef,
@@ -1149,6 +1239,107 @@ mod tests {
         assert_eq!(annotations.len(), 1);
         assert_eq!(annotations[0].attribution, Attribution::Full);
         assert!(diagnostics.is_empty());
+    }
+
+    // ── Phase 2: widened scope & unattributable attributions ───────────
+
+    #[test]
+    fn test_descendants_widens_attribution() {
+        let r = annotate_expression(
+            "QuestionnaireResponse.descendants().where(linkId='x').answer.value",
+        )
+        .unwrap();
+        assert_eq!(r.len(), 1);
+        assert!(matches!(&r[0].kind, AnnotationKind::AnswerReference { link_ids, accessor }
+            if link_ids == &["x"] && *accessor == ValueAccessor::Value));
+        assert_eq!(r[0].attribution, Attribution::WidenedScope);
+    }
+
+    #[test]
+    fn test_children_on_group_produces_widened_item_ref() {
+        let r = annotate_expression("item.where(linkId='group1').children()").unwrap();
+        assert_eq!(r.len(), 1);
+        assert!(matches!(&r[0].kind, AnnotationKind::ItemReference { link_ids }
+            if link_ids == &["group1"]));
+        assert_eq!(r[0].attribution, Attribution::WidenedScope);
+    }
+
+    #[test]
+    fn test_repeat_widens_attribution() {
+        let r = annotate_expression(
+            "item.where(linkId='g').repeat(item).where(linkId='x').answer.value",
+        )
+        .unwrap();
+        assert_eq!(r.len(), 1);
+        assert_eq!(r[0].attribution, Attribution::WidenedScope);
+    }
+
+    #[test]
+    fn test_opaque_where_in_middle_preserves_link_ids() {
+        let r = annotate_expression(
+            "item.where(linkId='x').answer.where(value.code = 'yes').item.where(linkId='y').answer.value",
+        )
+        .unwrap();
+        // The answer ref annotation preserves both linkIds, attribution tainted.
+        let ann = r
+            .iter()
+            .find(|a| matches!(&a.kind, AnnotationKind::AnswerReference { .. }))
+            .expect("expected an answer reference");
+        assert!(matches!(&ann.kind, AnnotationKind::AnswerReference { link_ids, .. }
+            if link_ids == &["x", "y"]));
+        assert_eq!(ann.attribution, Attribution::Unattributable);
+    }
+
+    #[test]
+    fn test_iif_without_terminal_emits_diagnostic() {
+        let (annotations, diagnostics) = annotate_expression_with_diagnostics(
+            "item.iif(linkId='x', answer.value, 'fallback')",
+        )
+        .unwrap();
+        assert!(annotations.is_empty());
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(
+            diagnostics[0].code,
+            DiagnosticCode::ExpressionNotAttributable
+        );
+    }
+
+    #[test]
+    fn test_widened_attribution_skips_type_validation() {
+        use crate::analyze::{analyze_expression, AnalysisContext, DiagnosticCode};
+        use crate::analyze::questionnaire_index::QuestionnaireIndex;
+        use serde_json::json;
+
+        let q = json!({
+            "resourceType": "Questionnaire",
+            "item": [{"linkId": "bool1", "type": "boolean"}]
+        });
+        let idx = QuestionnaireIndex::build(&q);
+
+        // .code on a boolean is normally an error…
+        let direct = analyze_expression(
+            "item.where(linkId='bool1').answer.value.code",
+            &idx,
+            &AnalysisContext::default(),
+        )
+        .unwrap();
+        assert!(direct
+            .diagnostics
+            .iter()
+            .any(|d| d.code == DiagnosticCode::InvalidAccessorForType));
+
+        // …but when reached through descendants(), the path is no longer
+        // precisely modeled and we skip the type check.
+        let widened = analyze_expression(
+            "QuestionnaireResponse.descendants().where(linkId='bool1').answer.value.code",
+            &idx,
+            &AnalysisContext::default(),
+        )
+        .unwrap();
+        assert!(widened
+            .diagnostics
+            .iter()
+            .all(|d| d.code != DiagnosticCode::InvalidAccessorForType));
     }
 
     #[test]

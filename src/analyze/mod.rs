@@ -43,23 +43,55 @@ pub enum AnnotationKind {
 
 /// How precisely an annotation attributes to its linkId scope.
 ///
-/// `Full` — the expression navigates to the complete set of answers/items
-/// for the named linkId(s).
+/// Ordered from most to least precise. Transitions only ever demote (never
+/// promote) — once a chain loses precision, it stays lost.
 ///
-/// `PartialPositional` — a positional selector (`first()`, `[i]`, etc.)
-/// narrowed the navigation to a subset. The linkId attribution still holds,
-/// but the evaluator sees fewer items than a bare `where(linkId=…)` would.
+/// - `Full` — the expression navigates to the complete set of answers/items
+///   for the named linkId(s).
+/// - `PartialPositional` — a positional selector (`first()`, `[i]`, `take(1)`, …)
+///   narrowed the navigation to a subset. The linkId attribution still holds,
+///   but the evaluator sees fewer items than a bare `where(linkId=…)` would.
+/// - `WidenedScope` — a scope-widening operator (`descendants()`, `children()`,
+///   `repeat()`) broke the structural parent-chain. linkIds are still known,
+///   but the path to them is no longer deterministic — parent-context
+///   reachability checks can't be trusted.
+/// - `Unattributable` — an opaque operation (`iif()`, `select()`, non-linkId
+///   `where(…)`, unknown function) severed precise attribution. linkIds
+///   collected up to that point are preserved but consumers should treat them
+///   as hints, not guarantees.
 #[derive(Debug, Clone, Copy, PartialEq, Default, serde::Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Attribution {
     #[default]
     Full,
     PartialPositional,
+    WidenedScope,
+    Unattributable,
 }
 
 impl Attribution {
     pub(crate) fn is_default(&self) -> bool {
         matches!(self, Attribution::Full)
+    }
+
+    /// Rank within the lattice. Higher = more precise.
+    fn rank(&self) -> u8 {
+        match self {
+            Attribution::Full => 3,
+            Attribution::PartialPositional => 2,
+            Attribution::WidenedScope => 1,
+            Attribution::Unattributable => 0,
+        }
+    }
+
+    /// Degrade `self` toward `floor`, never below.
+    /// Returns the lower-ranked of the two.
+    pub(crate) fn demote_to(self, floor: Attribution) -> Attribution {
+        if floor.rank() < self.rank() {
+            floor
+        } else {
+            self
+        }
     }
 }
 
