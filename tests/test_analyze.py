@@ -201,6 +201,51 @@ def annotate_full_attribution_not_emitted_for_clean_chain_test():
     assert "attribution" not in result[0]
 
 
+# ── annotate_expression: context variables & composite positional (Phase 3)
+
+
+def annotate_this_dot_link_id_in_where_test():
+    # `$this.linkId = 'x'` inside where() is equivalent to `linkId = 'x'`.
+    result = annotate_expression("item.where($this.linkId = 'x').answer.value")
+    assert len(result) == 1
+    ann = result[0]
+    assert ann["kind"] == "answer_reference"
+    assert ann["link_ids"] == ["x"]
+    # Full attribution preserved — wire shape omits the attribution key.
+    assert "attribution" not in ann
+
+
+def annotate_skip_zero_take_one_demotes_test():
+    result = annotate_expression("item.where(linkId='x').answer.skip(0).take(1).value")
+    assert len(result) == 1
+    assert result[0]["attribution"] == "partial_positional"
+
+
+def annotate_skip_one_take_two_preserves_attribution_test():
+    # `.skip(1).take(2)` leaves cardinality at Many → attribution stays Full.
+    result = annotate_expression("item.where(linkId='x').answer.skip(1).take(2).value")
+    assert len(result) == 1
+    assert "attribution" not in result[0]
+
+
+def annotate_take_one_demotes_test():
+    result = annotate_expression("item.where(linkId='x').answer.take(1).value")
+    assert len(result) == 1
+    assert result[0]["attribution"] == "partial_positional"
+
+
+def annotate_take_many_is_transparent_test():
+    result = annotate_expression("item.where(linkId='x').answer.take(5).value")
+    assert len(result) == 1
+    assert "attribution" not in result[0]
+
+
+def annotate_skip_alone_is_transparent_test():
+    result = annotate_expression("item.where(linkId='x').answer.skip(3).value")
+    assert len(result) == 1
+    assert "attribution" not in result[0]
+
+
 # ── analyze_expression ─────────────────────────────────────────────────
 
 
