@@ -10,13 +10,29 @@ use super::{Annotation, AnnotationKind, Attribution, Diagnostic, DiagnosticCode,
 
 // ── Helper types ────────────────────────────────────────────────────────
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) enum ContextVarName {
+    This,
+    Index,
+    Total,
+}
+
 pub(crate) enum ChainStepKind {
     Identifier(String),
-    Function { name: String, link_id: Option<String> },
+    Function {
+        name: String,
+        link_id: Option<String>,
+        /// Integer literal argument when the call is `skip(n)` / `take(m)`.
+        /// Used to reason about cardinality in composite positional ops.
+        integer_arg: Option<i64>,
+    },
     External,
+    /// `$this` / `$index` / `$total` — FHIRPath context variables.
+    /// The specific identity is currently only used for debugging; the state
+    /// machine treats all three as transparent pass-throughs at Start.
+    ContextVar(#[allow(dead_code)] ContextVarName),
     /// Bracket indexer `[expr]`. `index` is `Some(n)` only for integer literals.
-    /// Currently only the presence of the indexer matters for attribution;
-    /// the literal value becomes load-bearing in Phase 3.
+    /// Currently only the presence of the indexer matters for attribution.
     Indexer {
         #[allow(dead_code)]
         index: Option<i64>,
@@ -113,7 +129,22 @@ fn find_string_literal_node(node: &AstNode) -> Option<&AstNode> {
 }
 
 /// Navigate TermExpression -> InvocationTerm -> MemberInvocation -> Identifier to get the name.
+///
+/// Also accepts `$this.<ident>` — an InvocationExpression whose receiver is
+/// `$this` and whose member names `<ident>`.
 fn extract_member_identifier_name(node: &AstNode) -> Option<&str> {
+    if node.node_type == "InvocationExpression" {
+        let receiver = node.children.first()?;
+        let member = node.children.get(1)?;
+        if !is_this_invocation(receiver) {
+            return None;
+        }
+        if member.node_type != "MemberInvocation" {
+            return None;
+        }
+        return get_identifier_name(member.children.first()?);
+    }
+
     let mut current = node;
     if current.node_type == "TermExpression" {
         current = current.children.first()?;
@@ -127,6 +158,24 @@ fn extract_member_identifier_name(node: &AstNode) -> Option<&str> {
     get_identifier_name(current)
 }
 
+/// Returns true if `node` is a `TermExpression -> InvocationTerm -> ThisInvocation`.
+fn is_this_invocation(node: &AstNode) -> bool {
+    let mut current = node;
+    if current.node_type == "TermExpression" {
+        match current.children.first() {
+            Some(c) => current = c,
+            None => return false,
+        }
+    }
+    if current.node_type == "InvocationTerm" {
+        match current.children.first() {
+            Some(c) => current = c,
+            None => return false,
+        }
+    }
+    current.node_type == "ThisInvocation"
+}
+
 /// Recursively flatten an InvocationExpression tree into a chain of steps.
 pub(crate) fn decompose_chain(node: &AstNode) -> Option<Vec<ChainStep>> {
     match node.node_type {
@@ -135,15 +184,28 @@ pub(crate) fn decompose_chain(node: &AstNode) -> Option<Vec<ChainStep>> {
             match inner.node_type {
                 "InvocationTerm" => {
                     let member = inner.children.first()?;
-                    if member.node_type == "MemberInvocation" {
-                        let ident = member.children.first()?;
-                        let name = get_identifier_name(ident)?.to_string();
-                        Some(vec![ChainStep {
-                            kind: ChainStepKind::Identifier(name),
+                    match member.node_type {
+                        "MemberInvocation" => {
+                            let ident = member.children.first()?;
+                            let name = get_identifier_name(ident)?.to_string();
+                            Some(vec![ChainStep {
+                                kind: ChainStepKind::Identifier(name),
+                                link_id_span: None,
+                            }])
+                        }
+                        "ThisInvocation" => Some(vec![ChainStep {
+                            kind: ChainStepKind::ContextVar(ContextVarName::This),
                             link_id_span: None,
-                        }])
-                    } else {
-                        None
+                        }]),
+                        "IndexInvocation" => Some(vec![ChainStep {
+                            kind: ChainStepKind::ContextVar(ContextVarName::Index),
+                            link_id_span: None,
+                        }]),
+                        "TotalInvocation" => Some(vec![ChainStep {
+                            kind: ChainStepKind::ContextVar(ContextVarName::Total),
+                            link_id_span: None,
+                        }]),
+                        _ => None,
                     }
                 }
                 "ExternalConstantTerm" => {
@@ -191,10 +253,16 @@ pub(crate) fn decompose_chain(node: &AstNode) -> Option<Vec<ChainStep>> {
                     } else {
                         (None, None)
                     };
+                    let integer_arg = if func_name == "skip" || func_name == "take" {
+                        extract_first_integer_arg(functn)
+                    } else {
+                        None
+                    };
                     steps.push(ChainStep {
                         kind: ChainStepKind::Function {
                             name: func_name,
                             link_id,
+                            integer_arg,
                         },
                         link_id_span,
                     });
@@ -218,6 +286,16 @@ pub(crate) fn decompose_chain(node: &AstNode) -> Option<Vec<ChainStep>> {
         }
         _ => None,
     }
+}
+
+/// If the `Functn` node has a first argument that is an integer literal, return it.
+fn extract_first_integer_arg(functn: &AstNode) -> Option<i64> {
+    let param_list = functn.children.get(1)?;
+    if param_list.node_type != "ParamList" {
+        return None;
+    }
+    let arg = param_list.children.first()?;
+    extract_integer_literal(arg)
 }
 
 /// Walk TermExpression -> LiteralTerm -> NumberLiteral and parse its text as an integer.
@@ -253,7 +331,12 @@ enum Anchor {
     AnswerValue,
     /// Arrived at `…answer.value.<code|display>`.
     AnswerValueProp(ValueAccessor),
-    /// Left the lattice irrecoverably.
+    /// After a scope-widening operation (`descendants()`, `children()`,
+    /// `repeat()`). We're inside QR territory but no longer tracking a
+    /// structural parent-chain.
+    Widened,
+    /// Left the lattice irrecoverably — `first()` on unfiltered `item`,
+    /// unknown identifier on a navigation chain, etc.
     Unattributable,
 }
 
@@ -288,11 +371,70 @@ impl SelectionState {
     fn in_qr_scope(&self) -> bool {
         !matches!(self.anchor, Anchor::Start | Anchor::Unattributable)
     }
+
+    /// Anchors on which attribution-demoting ops should keep the anchor but
+    /// lower attribution, rather than hard-stopping to `Unattributable`.
+    fn is_attributed_anchor(&self) -> bool {
+        matches!(
+            self.anchor,
+            Anchor::FilteredItems
+                | Anchor::Answer
+                | Anchor::AnswerValue
+                | Anchor::AnswerValueProp(_)
+                | Anchor::Widened
+                | Anchor::Items
+        )
+    }
+}
+
+/// Degrade attribution for a scope-widening step (`descendants`, `children`,
+/// `repeat`). `Full` → `WidenedScope`; anything already lossy drops to
+/// `Unattributable` because we've piled loss on top of loss.
+fn widen_attribution(a: Attribution) -> Attribution {
+    match a {
+        Attribution::Full => Attribution::WidenedScope,
+        _ => Attribution::Unattributable,
+    }
+}
+
+fn is_widening_function(name: &str) -> bool {
+    matches!(name, "descendants" | "children" | "repeat")
 }
 
 /// Set of positional selector function names that narrow cardinality to one.
 fn is_positional_function(name: &str) -> bool {
     matches!(name, "first" | "last" | "single" | "tail")
+}
+
+/// `take(1)` — collapses cardinality to one like `first()`.
+fn is_composite_one_positional(step: &ChainStep) -> bool {
+    matches!(
+        &step.kind,
+        ChainStepKind::Function {
+            name,
+            integer_arg: Some(1),
+            ..
+        } if name == "take"
+    )
+}
+
+/// `skip(n)` (any `n`) and `take(m)` with `m != 1` — pass through without
+/// collapsing cardinality. Attribution stays whatever it was.
+fn is_passthrough_skip_or_take(step: &ChainStep) -> bool {
+    match &step.kind {
+        ChainStepKind::Function {
+            name, integer_arg, ..
+        } => {
+            if name == "skip" {
+                true
+            } else if name == "take" {
+                integer_arg != &Some(1)
+            } else {
+                false
+            }
+        }
+        _ => false,
+    }
 }
 
 enum MatchKind {
@@ -319,9 +461,43 @@ enum MatchOutcome {
 
 /// Transition one step.
 fn transition(mut state: SelectionState, step: &ChainStep) -> SelectionState {
+    // Composite positional ops (take(1) / skip / take(m!=1)) applied to an
+    // attributed anchor are handled uniformly: take(1) collapses cardinality,
+    // skip / take(m!=1) just pass through.
+    let attributed = matches!(
+        state.anchor,
+        Anchor::FilteredItems | Anchor::Answer | Anchor::AnswerValue | Anchor::AnswerValueProp(_)
+    );
+    if attributed {
+        if is_composite_one_positional(step) {
+            state.attribution = Attribution::PartialPositional;
+            state.cardinality = Cardinality::One;
+            return state;
+        }
+        if is_passthrough_skip_or_take(step) {
+            return state;
+        }
+    }
+
+    // Widening ops on any live anchor (including Start) enter Widened scope
+    // and demote attribution. Handled ahead of the main match so they compose
+    // cleanly regardless of the current anchor.
+    if let ChainStepKind::Function { name, .. } = &step.kind {
+        if is_widening_function(name) && !matches!(state.anchor, Anchor::Unattributable) {
+            state.attribution = widen_attribution(state.attribution);
+            state.anchor = Anchor::Widened;
+            return state;
+        }
+    }
+
     let next_anchor = match (&state.anchor, &step.kind) {
         // External constants (%context, %resource, %factory...) stay at Start.
         (Anchor::Start, ChainStepKind::External) => Anchor::Start,
+
+        // Context variables ($this / $index / $total) at Start stay at Start —
+        // they're transparent pass-throughs for navigation recognition. Real
+        // attribution in predicates happens via extract_link_id_from_where.
+        (Anchor::Start, ChainStepKind::ContextVar(_)) => Anchor::Start,
 
         // Start + "item" -> Items
         (Anchor::Start, ChainStepKind::Identifier(name)) if name == "item" => Anchor::Items,
@@ -332,11 +508,29 @@ fn transition(mut state: SelectionState, step: &ChainStep) -> SelectionState {
             ChainStepKind::Function {
                 name,
                 link_id: Some(id),
+                ..
             },
         ) if name == "where" => {
             state.link_ids.push(id.clone());
             Anchor::FilteredItems
         }
+
+        // Widened + where(linkId=…) — anchor drops into FilteredItems so we
+        // can still navigate to .answer.value, but attribution stays WidenedScope.
+        (
+            Anchor::Widened,
+            ChainStepKind::Function {
+                name,
+                link_id: Some(id),
+                ..
+            },
+        ) if name == "where" => {
+            state.link_ids.push(id.clone());
+            Anchor::FilteredItems
+        }
+
+        // Widened + "item" -> Items (still carrying widened attribution).
+        (Anchor::Widened, ChainStepKind::Identifier(name)) if name == "item" => Anchor::Items,
 
         // FilteredItems / Answer -> descend through .item (nested navigation)
         (Anchor::FilteredItems, ChainStepKind::Identifier(name)) if name == "item" => Anchor::Items,
@@ -425,10 +619,25 @@ fn transition(mut state: SelectionState, step: &ChainStep) -> SelectionState {
         // Any step on Unattributable keeps us Unattributable.
         (Anchor::Unattributable, _) => Anchor::Unattributable,
 
-        // Anything else walks off the lattice. If we were inside a QR scope,
-        // signal Unattributable so the caller emits a diagnostic; if we were
-        // still at Start, the chain simply doesn't apply to us.
+        // Anything else walks off our explicit map. Two cases:
+        //
+        // - Opaque function call (`iif`, `select`, non-linkId `where`, any
+        //   unrecognized function) on an attributed anchor: demote attribution
+        //   to Unattributable but keep the anchor. A subsequent
+        //   `.where(linkId=…)` can still collect linkIds, and a terminal
+        //   `.answer.value` still produces an annotation (attribution carries
+        //   the taint so consumers know not to fully trust it).
+        //
+        // - Anything else while in QR scope: hard stop to `Anchor::Unattributable`.
+        //
+        // - Anything while still at Start: non-QR chain — reset cleanly.
         _ => {
+            if state.is_attributed_anchor()
+                && matches!(&step.kind, ChainStepKind::Function { .. })
+            {
+                state.attribution = state.attribution.demote_to(Attribution::Unattributable);
+                return state; // anchor unchanged
+            }
             if state.in_qr_scope() {
                 Anchor::Unattributable
             } else {
@@ -463,17 +672,31 @@ fn match_qr_path(steps: &[ChainStep]) -> MatchOutcome {
     }
 
     match state.anchor {
-        Anchor::AnswerValue => MatchOutcome::Annotation(MatchResult {
-            link_ids: state.link_ids,
-            kind: MatchKind::AnswerRef(ValueAccessor::Value),
-            attribution: state.attribution,
-        }),
-        Anchor::AnswerValueProp(accessor) => MatchOutcome::Annotation(MatchResult {
-            link_ids: state.link_ids,
-            kind: MatchKind::AnswerRef(accessor),
-            attribution: state.attribution,
-        }),
+        Anchor::AnswerValue if !state.link_ids.is_empty() => {
+            MatchOutcome::Annotation(MatchResult {
+                link_ids: state.link_ids,
+                kind: MatchKind::AnswerRef(ValueAccessor::Value),
+                attribution: state.attribution,
+            })
+        }
+        Anchor::AnswerValueProp(accessor) if !state.link_ids.is_empty() => {
+            MatchOutcome::Annotation(MatchResult {
+                link_ids: state.link_ids,
+                kind: MatchKind::AnswerRef(accessor),
+                attribution: state.attribution,
+            })
+        }
         Anchor::FilteredItems if !state.link_ids.is_empty() => {
+            MatchOutcome::Annotation(MatchResult {
+                link_ids: state.link_ids,
+                kind: MatchKind::ItemRef,
+                attribution: state.attribution,
+            })
+        }
+        // Widened + collected linkIds is a valid ItemRef terminal (e.g.
+        // `item.where(linkId='g').children()`). Attribution carries the
+        // widening taint.
+        Anchor::Widened if !state.link_ids.is_empty() => {
             MatchOutcome::Annotation(MatchResult {
                 link_ids: state.link_ids,
                 kind: MatchKind::ItemRef,
@@ -947,5 +1170,196 @@ mod tests {
             diagnostics[0].code,
             DiagnosticCode::ExpressionNotAttributable
         );
+    }
+
+    // ── Phase 3: context variables & composite positional ops ──────────
+
+    #[test]
+    fn test_this_dot_link_id_in_where_is_attributed() {
+        let r =
+            annotate_expression("item.where($this.linkId = 'x').answer.value").unwrap();
+        assert_eq!(r.len(), 1);
+        assert!(matches!(&r[0].kind, AnnotationKind::AnswerReference { link_ids, accessor }
+            if link_ids == &["x"] && *accessor == ValueAccessor::Value));
+        // `$this.linkId` is semantically identical to `linkId` inside a where
+        // predicate, so attribution stays Full.
+        assert_eq!(r[0].attribution, Attribution::Full);
+    }
+
+    #[test]
+    fn test_skip_zero_take_one_demotes_to_partial_positional() {
+        let r =
+            annotate_expression("item.where(linkId='x').answer.skip(0).take(1).value")
+                .unwrap();
+        assert_eq!(r.len(), 1);
+        assert!(matches!(&r[0].kind, AnnotationKind::AnswerReference { link_ids, accessor }
+            if link_ids == &["x"] && *accessor == ValueAccessor::Value));
+        assert_eq!(r[0].attribution, Attribution::PartialPositional);
+    }
+
+    #[test]
+    fn test_skip_one_take_two_preserves_attribution() {
+        // take(m) with m != 1 is a pass-through — cardinality stays Many,
+        // attribution stays Full.
+        let r =
+            annotate_expression("item.where(linkId='x').answer.skip(1).take(2).value")
+                .unwrap();
+        assert_eq!(r.len(), 1);
+        assert!(matches!(&r[0].kind, AnnotationKind::AnswerReference { link_ids, accessor }
+            if link_ids == &["x"] && *accessor == ValueAccessor::Value));
+        assert_eq!(r[0].attribution, Attribution::Full);
+    }
+
+    #[test]
+    fn test_take_one_between_answer_and_value_demotes() {
+        let r =
+            annotate_expression("item.where(linkId='x').answer.take(1).value").unwrap();
+        assert_eq!(r.len(), 1);
+        assert!(matches!(&r[0].kind, AnnotationKind::AnswerReference { link_ids, accessor }
+            if link_ids == &["x"] && *accessor == ValueAccessor::Value));
+        assert_eq!(r[0].attribution, Attribution::PartialPositional);
+    }
+
+    #[test]
+    fn test_take_two_is_transparent() {
+        // Standalone .take(m) with m != 1 — no demotion, no diagnostic.
+        let (annotations, diagnostics) =
+            annotate_expression_with_diagnostics("item.where(linkId='x').answer.take(2).value")
+                .unwrap();
+        assert_eq!(annotations.len(), 1);
+        assert_eq!(annotations[0].attribution, Attribution::Full);
+        assert!(diagnostics.is_empty());
+    }
+
+    #[test]
+    fn test_skip_alone_is_transparent() {
+        let (annotations, diagnostics) =
+            annotate_expression_with_diagnostics("item.where(linkId='x').answer.skip(1).value")
+                .unwrap();
+        assert_eq!(annotations.len(), 1);
+        assert_eq!(annotations[0].attribution, Attribution::Full);
+        assert!(diagnostics.is_empty());
+    }
+
+    // ── Phase 2: widened scope & unattributable attributions ───────────
+
+    #[test]
+    fn test_descendants_widens_attribution() {
+        let r = annotate_expression(
+            "QuestionnaireResponse.descendants().where(linkId='x').answer.value",
+        )
+        .unwrap();
+        assert_eq!(r.len(), 1);
+        assert!(matches!(&r[0].kind, AnnotationKind::AnswerReference { link_ids, accessor }
+            if link_ids == &["x"] && *accessor == ValueAccessor::Value));
+        assert_eq!(r[0].attribution, Attribution::WidenedScope);
+    }
+
+    #[test]
+    fn test_children_on_group_produces_widened_item_ref() {
+        let r = annotate_expression("item.where(linkId='group1').children()").unwrap();
+        assert_eq!(r.len(), 1);
+        assert!(matches!(&r[0].kind, AnnotationKind::ItemReference { link_ids }
+            if link_ids == &["group1"]));
+        assert_eq!(r[0].attribution, Attribution::WidenedScope);
+    }
+
+    #[test]
+    fn test_repeat_widens_attribution() {
+        let r = annotate_expression(
+            "item.where(linkId='g').repeat(item).where(linkId='x').answer.value",
+        )
+        .unwrap();
+        assert_eq!(r.len(), 1);
+        assert_eq!(r[0].attribution, Attribution::WidenedScope);
+    }
+
+    #[test]
+    fn test_opaque_where_in_middle_preserves_link_ids() {
+        let r = annotate_expression(
+            "item.where(linkId='x').answer.where(value.code = 'yes').item.where(linkId='y').answer.value",
+        )
+        .unwrap();
+        // The answer ref annotation preserves both linkIds, attribution tainted.
+        let ann = r
+            .iter()
+            .find(|a| matches!(&a.kind, AnnotationKind::AnswerReference { .. }))
+            .expect("expected an answer reference");
+        assert!(matches!(&ann.kind, AnnotationKind::AnswerReference { link_ids, .. }
+            if link_ids == &["x", "y"]));
+        assert_eq!(ann.attribution, Attribution::Unattributable);
+    }
+
+    #[test]
+    fn test_iif_without_terminal_emits_diagnostic() {
+        let (annotations, diagnostics) = annotate_expression_with_diagnostics(
+            "item.iif(linkId='x', answer.value, 'fallback')",
+        )
+        .unwrap();
+        assert!(annotations.is_empty());
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(
+            diagnostics[0].code,
+            DiagnosticCode::ExpressionNotAttributable
+        );
+    }
+
+    #[test]
+    fn test_widened_attribution_skips_type_validation() {
+        use crate::analyze::{analyze_expression, AnalysisContext, DiagnosticCode};
+        use crate::analyze::questionnaire_index::QuestionnaireIndex;
+        use serde_json::json;
+
+        let q = json!({
+            "resourceType": "Questionnaire",
+            "item": [{"linkId": "bool1", "type": "boolean"}]
+        });
+        let idx = QuestionnaireIndex::build(&q);
+
+        // .code on a boolean is normally an error…
+        let direct = analyze_expression(
+            "item.where(linkId='bool1').answer.value.code",
+            &idx,
+            &AnalysisContext::default(),
+        )
+        .unwrap();
+        assert!(direct
+            .diagnostics
+            .iter()
+            .any(|d| d.code == DiagnosticCode::InvalidAccessorForType));
+
+        // …but when reached through descendants(), the path is no longer
+        // precisely modeled and we skip the type check.
+        let widened = analyze_expression(
+            "QuestionnaireResponse.descendants().where(linkId='bool1').answer.value.code",
+            &idx,
+            &AnalysisContext::default(),
+        )
+        .unwrap();
+        assert!(widened
+            .diagnostics
+            .iter()
+            .all(|d| d.code != DiagnosticCode::InvalidAccessorForType));
+    }
+
+    #[test]
+    fn test_dollar_index_in_where_does_not_false_match() {
+        // `$index = 0` inside a where() is not a linkId reference — we must
+        // not mis-attribute it. The chain still degrades because there's no
+        // recognizable linkId predicate, but we shouldn't crash or claim a
+        // linkId that isn't there.
+        let (annotations, _diagnostics) =
+            annotate_expression_with_diagnostics("item.where($index = 0).answer.value")
+                .unwrap();
+        // No annotation with a bogus linkId.
+        for ann in &annotations {
+            match &ann.kind {
+                AnnotationKind::AnswerReference { link_ids, .. }
+                | AnnotationKind::ItemReference { link_ids } => {
+                    assert!(link_ids.is_empty(), "should not invent a linkId");
+                }
+                _ => {}
+            }
+        }
     }
 }

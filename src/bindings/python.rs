@@ -219,6 +219,8 @@ fn attribution_to_str(attribution: &Attribution) -> &'static str {
     match attribution {
         Attribution::Full => "full",
         Attribution::PartialPositional => "partial_positional",
+        Attribution::WidenedScope => "widened_scope",
+        Attribution::Unattributable => "unattributable",
     }
 }
 

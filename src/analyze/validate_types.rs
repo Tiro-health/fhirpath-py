@@ -1,5 +1,5 @@
 use crate::analyze::{
-    Annotation, AnnotationKind, Diagnostic, DiagnosticCode, Severity, ValueAccessor,
+    Annotation, AnnotationKind, Attribution, Diagnostic, DiagnosticCode, Severity, ValueAccessor,
 };
 use crate::analyze::questionnaire_index::QuestionnaireIndex;
 
@@ -55,6 +55,16 @@ pub(crate) fn validate_value_types_from_annotations(
     let mut diagnostics = Vec::new();
 
     for ann in annotations {
+        // When attribution is degraded below PartialPositional, we're no longer
+        // confident the accessor is reached via the modeled path — the chain
+        // may have widened scope or passed through an opaque filter. Skip
+        // type-checking to avoid false-positive diagnostics.
+        if matches!(
+            ann.attribution,
+            Attribution::WidenedScope | Attribution::Unattributable
+        ) {
+            continue;
+        }
         if let AnnotationKind::AnswerReference { link_ids, accessor } = &ann.kind {
             let Some(last_link_id) = link_ids.last() else {
                 continue;

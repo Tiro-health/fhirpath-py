@@ -1,22 +1,38 @@
 use crate::analyze::{
-    Annotation, AnnotationKind, Diagnostic, DiagnosticCode, Severity, Span,
+    Annotation, AnnotationKind, Attribution, Diagnostic, DiagnosticCode, Severity, Span,
 };
 use crate::analyze::annotations::annotate_expression;
 use crate::analyze::questionnaire_index::QuestionnaireIndex;
 
-/// Extract the terminal linkId from annotations (prefers ItemReference).
-fn extract_target_link_id(annotations: &[Annotation]) -> Option<&str> {
+/// Extract the annotation we'd use to attribute the expression as a whole
+/// (prefers ItemReference, falls back to AnswerReference).
+fn extract_target_annotation(annotations: &[Annotation]) -> Option<&Annotation> {
     for ann in annotations {
-        if let AnnotationKind::ItemReference { link_ids } = &ann.kind {
-            return link_ids.last().map(|s| s.as_str());
+        if let AnnotationKind::ItemReference { .. } = &ann.kind {
+            return Some(ann);
         }
     }
     for ann in annotations {
-        if let AnnotationKind::AnswerReference { link_ids, .. } = &ann.kind {
-            return link_ids.last().map(|s| s.as_str());
+        if let AnnotationKind::AnswerReference { .. } = &ann.kind {
+            return Some(ann);
         }
     }
     None
+}
+
+fn annotation_link_ids(ann: &Annotation) -> &[String] {
+    match &ann.kind {
+        AnnotationKind::ItemReference { link_ids } => link_ids,
+        AnnotationKind::AnswerReference { link_ids, .. } => link_ids,
+        AnnotationKind::CodedValue { .. } => &[],
+    }
+}
+
+fn is_trusted_for_reachability(attribution: Attribution) -> bool {
+    matches!(
+        attribution,
+        Attribution::Full | Attribution::PartialPositional
+    )
 }
 
 /// Validate structural properties of item references in any expression.
@@ -63,29 +79,43 @@ pub(crate) fn validate_item_refs(
     }
 
     // Parent context reachability — check if this expression's item target
-    // is reachable from the parent scope
+    // is reachable from the parent scope. Skip when either side's attribution
+    // is degraded below PartialPositional: we'd be making claims about paths
+    // we no longer model precisely.
     if let Some(parent_expr) = parent_context_expr {
-        let target = extract_target_link_id(annotations);
-        if let Some(target_link_id) = target {
-            if !index.contains(target_link_id) {
-                return Ok(diagnostics);
-            }
-            let parent_annotations = annotate_expression(parent_expr)?;
-            if let Some(parent_link_id) = extract_target_link_id(&parent_annotations) {
-                if index.contains(parent_link_id)
-                    && !index.is_descendant(parent_link_id, target_link_id)
-                    && parent_link_id != target_link_id
-                {
-                    diagnostics.push(Diagnostic {
-                        span: Span { start: 0, end: expr.len() },
-                        severity: Severity::Error,
-                        code: DiagnosticCode::ContextUnreachableFromParent,
-                        message: format!(
-                            "Target '{}' is not reachable from parent context '{}'",
-                            target_link_id, parent_link_id
-                        ),
-                    });
-                }
+        let Some(target_ann) = extract_target_annotation(annotations) else {
+            return Ok(diagnostics);
+        };
+        if !is_trusted_for_reachability(target_ann.attribution) {
+            return Ok(diagnostics);
+        }
+        let Some(target_link_id) = annotation_link_ids(target_ann).last() else {
+            return Ok(diagnostics);
+        };
+        if !index.contains(target_link_id) {
+            return Ok(diagnostics);
+        }
+        let parent_annotations = annotate_expression(parent_expr)?;
+        let Some(parent_ann) = extract_target_annotation(&parent_annotations) else {
+            return Ok(diagnostics);
+        };
+        if !is_trusted_for_reachability(parent_ann.attribution) {
+            return Ok(diagnostics);
+        }
+        if let Some(parent_link_id) = annotation_link_ids(parent_ann).last() {
+            if index.contains(parent_link_id)
+                && !index.is_descendant(parent_link_id, target_link_id)
+                && parent_link_id != target_link_id
+            {
+                diagnostics.push(Diagnostic {
+                    span: Span { start: 0, end: expr.len() },
+                    severity: Severity::Error,
+                    code: DiagnosticCode::ContextUnreachableFromParent,
+                    message: format!(
+                        "Target '{}' is not reachable from parent context '{}'",
+                        target_link_id, parent_link_id
+                    ),
+                });
             }
         }
     }

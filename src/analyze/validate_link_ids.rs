@@ -22,6 +22,7 @@ fn collect_link_ids_recursive(node: &AstNode, out: &mut Vec<(String, Span)>) {
                 if let ChainStepKind::Function {
                     name,
                     link_id: Some(id),
+                    ..
                 } = &step.kind
                 {
                     if name == "where" {
