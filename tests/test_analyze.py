@@ -167,6 +167,40 @@ def annotate_syntax_error_test():
         annotate_expression("!")
 
 
+# ── annotate_expression: positional selectors (Phase 1) ────────────────
+
+
+def annotate_positional_after_where_demotes_attribution_test():
+    result = annotate_expression("item.where(linkId='x').first().answer.value")
+    assert len(result) == 1
+    ann = result[0]
+    assert ann["kind"] == "answer_reference"
+    assert ann["link_ids"] == ["x"]
+    assert ann["accessor"] == "value"
+    assert ann["attribution"] == "partial_positional"
+
+
+def annotate_positional_after_value_demotes_attribution_test():
+    result = annotate_expression("item.where(linkId='x').answer.value.first()")
+    assert len(result) == 1
+    assert result[0]["attribution"] == "partial_positional"
+
+
+def annotate_indexer_after_where_demotes_item_ref_test():
+    result = annotate_expression("item.where(linkId='x')[0]")
+    assert len(result) == 1
+    ann = result[0]
+    assert ann["kind"] == "item_reference"
+    assert ann["link_ids"] == ["x"]
+    assert ann["attribution"] == "partial_positional"
+
+
+def annotate_full_attribution_not_emitted_for_clean_chain_test():
+    # Wire compat: dict shape is byte-identical to v3.0.0 when attribution is Full.
+    result = annotate_expression("item.where(linkId='x').answer.value.code")
+    assert "attribution" not in result[0]
+
+
 # ── analyze_expression ─────────────────────────────────────────────────
 
 
@@ -253,3 +287,14 @@ def analyze_syntax_error_test():
     idx = QuestionnaireIndex(QUESTIONNAIRE_JSON)
     with pytest.raises(SyntaxError):
         analyze_expression("!", idx)
+
+
+def analyze_expression_not_attributable_test():
+    idx = QuestionnaireIndex(QUESTIONNAIRE_JSON)
+    result = analyze_expression("item[0].answer.value", idx)
+    diags = result["diagnostics"]
+    assert any(d["code"] == "expression_not_attributable" for d in diags)
+    diag = next(d for d in diags if d["code"] == "expression_not_attributable")
+    assert diag["severity"] == "info"
+    # No annotation because the chain is unattributable.
+    assert result["annotations"] == []

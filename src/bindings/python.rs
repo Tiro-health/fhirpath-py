@@ -4,7 +4,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 
 use crate::analyze::{
-    self, AnnotationKind, DiagnosticCode, Severity, ValueAccessor,
+    self, AnnotationKind, Attribution, DiagnosticCode, Severity, ValueAccessor,
 };
 use crate::lexer::Token;
 use crate::AstNode;
@@ -161,6 +161,7 @@ fn severity_to_str(severity: &Severity) -> &'static str {
     match severity {
         Severity::Error => "error",
         Severity::Warning => "warning",
+        Severity::Info => "info",
     }
 }
 
@@ -172,6 +173,7 @@ fn diagnostic_code_to_str(code: &DiagnosticCode) -> &'static str {
         DiagnosticCode::MissingAccessorForCoding => "missing_accessor_for_coding",
         DiagnosticCode::ItemReferenceTargetsLeaf => "item_reference_targets_leaf",
         DiagnosticCode::ContextUnreachableFromParent => "context_unreachable_from_parent",
+        DiagnosticCode::ExpressionNotAttributable => "expression_not_attributable",
     }
 }
 
@@ -205,7 +207,19 @@ fn annotation_to_pydict(py: Python<'_>, ann: &analyze::Annotation) -> PyResult<P
             dict.set_item("context_link_id", context_link_id.as_str())?;
         }
     }
+    // Only emit `attribution` when non-default, preserving v3.0.0 dict shapes
+    // for callers that don't care about positional selectors.
+    if !ann.attribution.is_default() {
+        dict.set_item("attribution", attribution_to_str(&ann.attribution))?;
+    }
     Ok(dict.into())
+}
+
+fn attribution_to_str(attribution: &Attribution) -> &'static str {
+    match attribution {
+        Attribution::Full => "full",
+        Attribution::PartialPositional => "partial_positional",
+    }
 }
 
 fn diagnostic_to_pydict(py: Python<'_>, diag: &analyze::Diagnostic) -> PyResult<PyObject> {

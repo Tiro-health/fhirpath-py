@@ -41,10 +41,34 @@ pub enum AnnotationKind {
     },
 }
 
+/// How precisely an annotation attributes to its linkId scope.
+///
+/// `Full` — the expression navigates to the complete set of answers/items
+/// for the named linkId(s).
+///
+/// `PartialPositional` — a positional selector (`first()`, `[i]`, etc.)
+/// narrowed the navigation to a subset. The linkId attribution still holds,
+/// but the evaluator sees fewer items than a bare `where(linkId=…)` would.
+#[derive(Debug, Clone, Copy, PartialEq, Default, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Attribution {
+    #[default]
+    Full,
+    PartialPositional,
+}
+
+impl Attribution {
+    pub(crate) fn is_default(&self) -> bool {
+        matches!(self, Attribution::Full)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct Annotation {
     pub span: Span,
     pub kind: AnnotationKind,
+    #[serde(default, skip_serializing_if = "Attribution::is_default")]
+    pub attribution: Attribution,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
@@ -52,6 +76,7 @@ pub struct Annotation {
 pub enum Severity {
     Error,
     Warning,
+    Info,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
@@ -63,6 +88,7 @@ pub enum DiagnosticCode {
     MissingAccessorForCoding,
     ItemReferenceTargetsLeaf,
     ContextUnreachableFromParent,
+    ExpressionNotAttributable,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
@@ -110,8 +136,7 @@ pub fn analyze_expression(
     index: &questionnaire_index::QuestionnaireIndex,
     context: &AnalysisContext,
 ) -> Result<ExpressionAnalysis, crate::ParseError> {
-    let ann = annotations::annotate_expression(expr)?;
-    let mut diagnostics = Vec::new();
+    let (ann, mut diagnostics) = annotations::annotate_expression_with_diagnostics(expr)?;
 
     // 1. LinkId validation — applies to ALL expressions
     diagnostics.extend(validate_link_ids::validate_link_ids_from_expr(
