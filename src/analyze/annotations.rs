@@ -6,7 +6,7 @@
 
 use crate::parser::AstNode;
 
-use super::{Annotation, AnnotationKind, Span, ValueAccessor};
+use super::{Annotation, AnnotationKind, Attribution, Diagnostic, DiagnosticCode, Severity, Span, ValueAccessor};
 
 // ── Helper types ────────────────────────────────────────────────────────
 
@@ -14,6 +14,13 @@ pub(crate) enum ChainStepKind {
     Identifier(String),
     Function { name: String, link_id: Option<String> },
     External,
+    /// Bracket indexer `[expr]`. `index` is `Some(n)` only for integer literals.
+    /// Currently only the presence of the indexer matters for attribution;
+    /// the literal value becomes load-bearing in Phase 3.
+    Indexer {
+        #[allow(dead_code)]
+        index: Option<i64>,
+    },
 }
 
 pub(crate) struct ChainStep {
@@ -197,21 +204,95 @@ pub(crate) fn decompose_chain(node: &AstNode) -> Option<Vec<ChainStep>> {
 
             Some(steps)
         }
+        "IndexerExpression" => {
+            let receiver = node.children.first()?;
+            let index_expr = node.children.get(1)?;
+            let mut steps = decompose_chain(receiver)?;
+            steps.push(ChainStep {
+                kind: ChainStepKind::Indexer {
+                    index: extract_integer_literal(index_expr),
+                },
+                link_id_span: None,
+            });
+            Some(steps)
+        }
         _ => None,
     }
 }
 
-// ── QR state machine ────────────────────────────────────────────────────
+/// Walk TermExpression -> LiteralTerm -> NumberLiteral and parse its text as an integer.
+fn extract_integer_literal(node: &AstNode) -> Option<i64> {
+    let mut current = node;
+    if current.node_type == "TermExpression" {
+        current = current.children.first()?;
+    }
+    if current.node_type == "LiteralTerm" {
+        current = current.children.first()?;
+    }
+    if current.node_type == "NumberLiteral" {
+        let raw = current.terminal_node_text.first()?;
+        return raw.parse::<i64>().ok();
+    }
+    None
+}
 
-#[derive(Debug, Clone)]
-enum QRState {
+// ── QR selection state lattice ──────────────────────────────────────────
+
+/// Where in the QR navigation we currently are.
+#[derive(Debug, Clone, PartialEq)]
+enum Anchor {
+    /// Nothing recognized yet.
     Start,
-    Item,
-    ItemFiltered,
+    /// Arrived at `item` (possibly repeatedly) without a linkId filter.
+    Items,
+    /// Arrived at `item.where(linkId=…)`.
+    FilteredItems,
+    /// Arrived at `…answer`.
     Answer,
-    Value,
-    Prop(ValueAccessor),
-    Rejected,
+    /// Arrived at `…answer.value` (bare Value accessor).
+    AnswerValue,
+    /// Arrived at `…answer.value.<code|display>`.
+    AnswerValueProp(ValueAccessor),
+    /// Left the lattice irrecoverably.
+    Unattributable,
+}
+
+/// Number of elements currently selected.
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum Cardinality {
+    /// Exactly one (after a positional selector or a known-unique predicate).
+    One,
+    /// Zero or more.
+    Many,
+}
+
+/// Lattice cell propagated through the chain.
+#[derive(Debug, Clone)]
+struct SelectionState {
+    anchor: Anchor,
+    cardinality: Cardinality,
+    attribution: Attribution,
+    link_ids: Vec<String>,
+}
+
+impl SelectionState {
+    fn start() -> Self {
+        Self {
+            anchor: Anchor::Start,
+            cardinality: Cardinality::Many,
+            attribution: Attribution::Full,
+            link_ids: Vec::new(),
+        }
+    }
+
+    fn in_qr_scope(&self) -> bool {
+        !matches!(self.anchor, Anchor::Start | Anchor::Unattributable)
+    }
+}
+
+/// Set of positional selector function names that narrow cardinality to one.
+fn is_positional_function(name: &str) -> bool {
+    matches!(name, "first" | "last" | "single" | "tail")
 }
 
 enum MatchKind {
@@ -222,119 +303,245 @@ enum MatchKind {
 struct MatchResult {
     link_ids: Vec<String>,
     kind: MatchKind,
+    attribution: Attribution,
 }
 
-/// Run the QR navigation state machine over a chain of steps.
-fn match_qr_path(steps: &[ChainStep]) -> Option<MatchResult> {
-    let mut state = QRState::Start;
-    let mut link_ids: Vec<String> = Vec::new();
+/// Outcome of running the state machine over a chain.
+enum MatchOutcome {
+    /// Chain produced a recognizable QR reference.
+    Annotation(MatchResult),
+    /// Chain entered a QR-meaningful state then lost attribution —
+    /// caller should emit an `ExpressionNotAttributable` diagnostic.
+    Unattributable,
+    /// Chain never entered a QR-meaningful state (e.g. `Patient.name.given`).
+    NotApplicable,
+}
+
+/// Transition one step.
+fn transition(mut state: SelectionState, step: &ChainStep) -> SelectionState {
+    let next_anchor = match (&state.anchor, &step.kind) {
+        // External constants (%context, %resource, %factory...) stay at Start.
+        (Anchor::Start, ChainStepKind::External) => Anchor::Start,
+
+        // Start + "item" -> Items
+        (Anchor::Start, ChainStepKind::Identifier(name)) if name == "item" => Anchor::Items,
+
+        // Items + where(linkId=…) -> FilteredItems
+        (
+            Anchor::Items,
+            ChainStepKind::Function {
+                name,
+                link_id: Some(id),
+            },
+        ) if name == "where" => {
+            state.link_ids.push(id.clone());
+            Anchor::FilteredItems
+        }
+
+        // FilteredItems / Answer -> descend through .item (nested navigation)
+        (Anchor::FilteredItems, ChainStepKind::Identifier(name)) if name == "item" => Anchor::Items,
+        (Anchor::Answer, ChainStepKind::Identifier(name)) if name == "item" => Anchor::Items,
+
+        // FilteredItems + answer -> Answer
+        (Anchor::FilteredItems, ChainStepKind::Identifier(name)) if name == "answer" => {
+            Anchor::Answer
+        }
+
+        // Answer + value -> AnswerValue
+        (Anchor::Answer, ChainStepKind::Identifier(name)) if name == "value" => Anchor::AnswerValue,
+
+        // AnswerValue + code/display -> AnswerValueProp
+        (Anchor::AnswerValue, ChainStepKind::Identifier(name)) if name == "code" => {
+            Anchor::AnswerValueProp(ValueAccessor::Code)
+        }
+        (Anchor::AnswerValue, ChainStepKind::Identifier(name)) if name == "display" => {
+            Anchor::AnswerValueProp(ValueAccessor::Display)
+        }
+
+        // Positional selectors (first/last/single/tail/indexer).
+        //
+        // On attributed anchors (FilteredItems / Answer / AnswerValue /
+        // AnswerValueProp) they keep the anchor, narrow cardinality to One,
+        // and demote attribution to PartialPositional.
+        //
+        // On Items (unfiltered) they strip attribution — we can no longer
+        // say which linkId we're targeting.
+        (Anchor::FilteredItems, ChainStepKind::Function { name, .. })
+            if is_positional_function(name) =>
+        {
+            state.attribution = Attribution::PartialPositional;
+            state.cardinality = Cardinality::One;
+            Anchor::FilteredItems
+        }
+        (Anchor::Answer, ChainStepKind::Function { name, .. })
+            if is_positional_function(name) =>
+        {
+            state.attribution = Attribution::PartialPositional;
+            state.cardinality = Cardinality::One;
+            Anchor::Answer
+        }
+        (Anchor::AnswerValue, ChainStepKind::Function { name, .. })
+            if is_positional_function(name) =>
+        {
+            state.attribution = Attribution::PartialPositional;
+            state.cardinality = Cardinality::One;
+            Anchor::AnswerValue
+        }
+        (Anchor::AnswerValueProp(prop), ChainStepKind::Function { name, .. })
+            if is_positional_function(name) =>
+        {
+            state.attribution = Attribution::PartialPositional;
+            state.cardinality = Cardinality::One;
+            Anchor::AnswerValueProp(prop.clone())
+        }
+        (Anchor::FilteredItems, ChainStepKind::Indexer { .. }) => {
+            state.attribution = Attribution::PartialPositional;
+            state.cardinality = Cardinality::One;
+            Anchor::FilteredItems
+        }
+        (Anchor::Answer, ChainStepKind::Indexer { .. }) => {
+            state.attribution = Attribution::PartialPositional;
+            state.cardinality = Cardinality::One;
+            Anchor::Answer
+        }
+        (Anchor::AnswerValue, ChainStepKind::Indexer { .. }) => {
+            state.attribution = Attribution::PartialPositional;
+            state.cardinality = Cardinality::One;
+            Anchor::AnswerValue
+        }
+        (Anchor::AnswerValueProp(prop), ChainStepKind::Indexer { .. }) => {
+            state.attribution = Attribution::PartialPositional;
+            state.cardinality = Cardinality::One;
+            Anchor::AnswerValueProp(prop.clone())
+        }
+        // Positional on unfiltered Items: can't attribute.
+        (Anchor::Items, ChainStepKind::Function { name, .. })
+            if is_positional_function(name) =>
+        {
+            Anchor::Unattributable
+        }
+        (Anchor::Items, ChainStepKind::Indexer { .. }) => Anchor::Unattributable,
+
+        // Any step on Unattributable keeps us Unattributable.
+        (Anchor::Unattributable, _) => Anchor::Unattributable,
+
+        // Anything else walks off the lattice. If we were inside a QR scope,
+        // signal Unattributable so the caller emits a diagnostic; if we were
+        // still at Start, the chain simply doesn't apply to us.
+        _ => {
+            if state.in_qr_scope() {
+                Anchor::Unattributable
+            } else {
+                // Stay at Start: non-QR chain (e.g. Patient.name).
+                return SelectionState {
+                    anchor: Anchor::Start,
+                    cardinality: Cardinality::Many,
+                    attribution: Attribution::Full,
+                    link_ids: Vec::new(),
+                };
+            }
+        }
+    };
+
+    state.anchor = next_anchor;
+    state
+}
+
+/// Run the state machine and classify the terminal state.
+fn match_qr_path(steps: &[ChainStep]) -> MatchOutcome {
+    let mut state = SelectionState::start();
+    let mut ever_in_qr_scope = false;
 
     for step in steps {
-        state = match (&state, &step.kind) {
-            // Start + External -> Start (skip %context, %resource, etc.)
-            (QRState::Start, ChainStepKind::External) => QRState::Start,
-
-            // Start + "item" -> Item
-            (QRState::Start, ChainStepKind::Identifier(name)) if name == "item" => QRState::Item,
-
-            // Item + where(linkId=...) -> ItemFiltered
-            (
-                QRState::Item,
-                ChainStepKind::Function {
-                    name,
-                    link_id: Some(id),
-                },
-            ) if name == "where" => {
-                link_ids.push(id.clone());
-                QRState::ItemFiltered
-            }
-
-            // ItemFiltered + "answer" -> Answer
-            (QRState::ItemFiltered, ChainStepKind::Identifier(name)) if name == "answer" => {
-                QRState::Answer
-            }
-
-            // ItemFiltered + "item" -> Item (nested navigation)
-            (QRState::ItemFiltered, ChainStepKind::Identifier(name)) if name == "item" => {
-                QRState::Item
-            }
-
-            // Answer + "item" -> Item (nested navigation through answer)
-            (QRState::Answer, ChainStepKind::Identifier(name)) if name == "item" => {
-                QRState::Item
-            }
-
-            // Answer + "value" -> Value
-            (QRState::Answer, ChainStepKind::Identifier(name)) if name == "value" => {
-                QRState::Value
-            }
-
-            // Value + "code" -> Prop(Code)
-            (QRState::Value, ChainStepKind::Identifier(name)) if name == "code" => {
-                QRState::Prop(ValueAccessor::Code)
-            }
-
-            // Value + "display" -> Prop(Display)
-            (QRState::Value, ChainStepKind::Identifier(name)) if name == "display" => {
-                QRState::Prop(ValueAccessor::Display)
-            }
-
-            // Everything else -> Rejected
-            _ => QRState::Rejected,
-        };
-
-        if matches!(state, QRState::Rejected) {
-            return None;
+        state = transition(state, step);
+        if state.in_qr_scope() {
+            ever_in_qr_scope = true;
+        }
+        if matches!(state.anchor, Anchor::Unattributable) {
+            return MatchOutcome::Unattributable;
         }
     }
 
-    match state {
-        QRState::Value => Some(MatchResult {
-            link_ids,
+    match state.anchor {
+        Anchor::AnswerValue => MatchOutcome::Annotation(MatchResult {
+            link_ids: state.link_ids,
             kind: MatchKind::AnswerRef(ValueAccessor::Value),
+            attribution: state.attribution,
         }),
-        QRState::Prop(accessor) => Some(MatchResult {
-            link_ids,
+        Anchor::AnswerValueProp(accessor) => MatchOutcome::Annotation(MatchResult {
+            link_ids: state.link_ids,
             kind: MatchKind::AnswerRef(accessor),
+            attribution: state.attribution,
         }),
-        QRState::ItemFiltered if !link_ids.is_empty() => Some(MatchResult {
-            link_ids,
-            kind: MatchKind::ItemRef,
-        }),
-        _ => None,
+        Anchor::FilteredItems if !state.link_ids.is_empty() => {
+            MatchOutcome::Annotation(MatchResult {
+                link_ids: state.link_ids,
+                kind: MatchKind::ItemRef,
+                attribution: state.attribution,
+            })
+        }
+        // Reached `item` / `item.answer` but no usable terminal — treat as
+        // unattributable only if we actually walked into QR territory.
+        _ if ever_in_qr_scope => MatchOutcome::Unattributable,
+        _ => MatchOutcome::NotApplicable,
     }
 }
 
 // ── AST walkers ─────────────────────────────────────────────────────────
 
 /// Pass 1: Find answer and item references by DFS over the AST.
-fn find_answer_refs(node: &AstNode, out: &mut Vec<Annotation>) {
+/// Also emits `ExpressionNotAttributable` diagnostics for chains that entered
+/// QR territory but degraded.
+fn find_answer_refs(node: &AstNode, out: &mut Vec<Annotation>, diagnostics: &mut Vec<Diagnostic>) {
     // Try to match this node as a QR navigation chain
-    if node.node_type == "InvocationExpression" || node.node_type == "TermExpression" {
+    if matches!(
+        node.node_type,
+        "InvocationExpression" | "TermExpression" | "IndexerExpression"
+    ) {
         if let Some(steps) = decompose_chain(node) {
-            if let Some(result) = match_qr_path(&steps) {
-                let span = Span {
-                    start: node.byte_start,
-                    end: node.byte_end,
-                };
-                let kind = match result.kind {
-                    MatchKind::AnswerRef(accessor) => AnnotationKind::AnswerReference {
-                        link_ids: result.link_ids,
-                        accessor,
-                    },
-                    MatchKind::ItemRef => AnnotationKind::ItemReference {
-                        link_ids: result.link_ids,
-                    },
-                };
-                out.push(Annotation { span, kind });
-                return; // Don't recurse into children of a matched node
+            let span = Span {
+                start: node.byte_start,
+                end: node.byte_end,
+            };
+            match match_qr_path(&steps) {
+                MatchOutcome::Annotation(result) => {
+                    let kind = match result.kind {
+                        MatchKind::AnswerRef(accessor) => AnnotationKind::AnswerReference {
+                            link_ids: result.link_ids,
+                            accessor,
+                        },
+                        MatchKind::ItemRef => AnnotationKind::ItemReference {
+                            link_ids: result.link_ids,
+                        },
+                    };
+                    out.push(Annotation {
+                        span,
+                        kind,
+                        attribution: result.attribution,
+                    });
+                    return; // Don't recurse into children of a matched node
+                }
+                MatchOutcome::Unattributable => {
+                    diagnostics.push(Diagnostic {
+                        span,
+                        severity: Severity::Info,
+                        code: DiagnosticCode::ExpressionNotAttributable,
+                        message:
+                            "Expression navigates into a QuestionnaireResponse but cannot be attributed to a specific linkId"
+                                .to_string(),
+                    });
+                    return;
+                }
+                MatchOutcome::NotApplicable => {
+                    // Fall through to recurse.
+                }
             }
         }
     }
 
     // Recurse into children
     for child in &node.children {
-        find_answer_refs(child, out);
+        find_answer_refs(child, out, diagnostics);
     }
 }
 
@@ -493,6 +700,7 @@ fn find_coded_values(node: &AstNode, answer_refs: &[Annotation], out: &mut Vec<A
                     system,
                     context_link_id,
                 },
+                attribution: Attribution::Full,
             });
             return;
         }
@@ -505,6 +713,7 @@ fn find_coded_values(node: &AstNode, answer_refs: &[Annotation], out: &mut Vec<A
                     system: None,
                     context_link_id,
                 },
+                attribution: Attribution::Full,
             });
             return;
         }
@@ -521,19 +730,28 @@ fn find_coded_values(node: &AstNode, answer_refs: &[Annotation], out: &mut Vec<A
 /// Annotate a FHIRPath expression string, extracting answer references,
 /// item references, and coded values.
 pub fn annotate_expression(expr: &str) -> Result<Vec<Annotation>, crate::ParseError> {
+    Ok(annotate_expression_with_diagnostics(expr)?.0)
+}
+
+/// Variant of [`annotate_expression`] that also returns diagnostics emitted
+/// during annotation (currently just `ExpressionNotAttributable`).
+pub(crate) fn annotate_expression_with_diagnostics(
+    expr: &str,
+) -> Result<(Vec<Annotation>, Vec<Diagnostic>), crate::ParseError> {
     let tokens = crate::lexer::tokenize(expr).map_err(crate::ParseError)?;
     let mut p = crate::parser::Parser::new(&tokens);
     let root = p.parse_entire_expression().map_err(crate::ParseError)?;
 
     let mut answer_refs = Vec::new();
-    find_answer_refs(&root, &mut answer_refs);
+    let mut diagnostics = Vec::new();
+    find_answer_refs(&root, &mut answer_refs, &mut diagnostics);
 
     let mut coded_values = Vec::new();
     find_coded_values(&root, &answer_refs, &mut coded_values);
 
     let mut all: Vec<Annotation> = answer_refs.into_iter().chain(coded_values).collect();
     all.sort_by_key(|a| a.span.start);
-    Ok(all)
+    Ok((all, diagnostics))
 }
 
 // ── Tests ───────────────────────────────────────────────────────────────
@@ -640,5 +858,94 @@ mod tests {
         let r = annotate_expression(expr).unwrap();
         assert_eq!(r[0].span.start, 0);
         assert_eq!(r[0].span.end, expr.len());
+    }
+
+    // ── Phase 1: positional selectors & attribution ─────────────────────
+
+    #[test]
+    fn test_first_between_where_and_answer_demotes_attribution() {
+        // item.where(linkId='x').first().answer.value
+        let r =
+            annotate_expression("item.where(linkId='x').first().answer.value").unwrap();
+        assert_eq!(r.len(), 1);
+        assert!(matches!(&r[0].kind, AnnotationKind::AnswerReference { link_ids, accessor }
+            if link_ids == &["x"] && *accessor == ValueAccessor::Value));
+        assert_eq!(r[0].attribution, Attribution::PartialPositional);
+    }
+
+    #[test]
+    fn test_first_after_value_demotes_attribution() {
+        let r = annotate_expression("item.where(linkId='x').answer.value.first()").unwrap();
+        assert_eq!(r.len(), 1);
+        assert!(matches!(&r[0].kind, AnnotationKind::AnswerReference { link_ids, accessor }
+            if link_ids == &["x"] && *accessor == ValueAccessor::Value));
+        assert_eq!(r[0].attribution, Attribution::PartialPositional);
+    }
+
+    #[test]
+    fn test_indexer_on_unfiltered_item_is_unattributable() {
+        // item[0].answer.value — no linkId filter, positional op -> diagnostic
+        let (annotations, diagnostics) =
+            annotate_expression_with_diagnostics("item[0].answer.value").unwrap();
+        assert!(annotations.is_empty());
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(
+            diagnostics[0].code,
+            DiagnosticCode::ExpressionNotAttributable
+        );
+        assert_eq!(diagnostics[0].severity, Severity::Info);
+    }
+
+    #[test]
+    fn test_indexer_after_where_demotes_item_ref() {
+        let r = annotate_expression("item.where(linkId='x')[0]").unwrap();
+        assert_eq!(r.len(), 1);
+        assert!(matches!(&r[0].kind, AnnotationKind::ItemReference { link_ids }
+            if link_ids == &["x"]));
+        assert_eq!(r[0].attribution, Attribution::PartialPositional);
+    }
+
+    #[test]
+    fn test_full_attribution_preserved_for_legacy_chain() {
+        // Regression guard: pre-existing patterns stay `Full`.
+        let r = annotate_expression("item.where(linkId='x').answer.value.code").unwrap();
+        assert_eq!(r.len(), 1);
+        assert_eq!(r[0].attribution, Attribution::Full);
+    }
+
+    #[test]
+    fn test_non_qr_expression_no_diagnostic() {
+        // Plain FHIR navigation produces neither annotation nor diagnostic.
+        let (annotations, diagnostics) =
+            annotate_expression_with_diagnostics("Patient.name.given").unwrap();
+        assert!(annotations.is_empty());
+        assert!(diagnostics.is_empty());
+    }
+
+    #[test]
+    fn test_single_positional_demotes() {
+        let r =
+            annotate_expression("item.where(linkId='x').answer.value.single()").unwrap();
+        assert_eq!(r.len(), 1);
+        assert_eq!(r[0].attribution, Attribution::PartialPositional);
+    }
+
+    #[test]
+    fn test_last_positional_demotes() {
+        let r = annotate_expression("item.where(linkId='x').last().answer.value").unwrap();
+        assert_eq!(r.len(), 1);
+        assert_eq!(r[0].attribution, Attribution::PartialPositional);
+    }
+
+    #[test]
+    fn test_first_on_unfiltered_items_is_unattributable() {
+        let (annotations, diagnostics) =
+            annotate_expression_with_diagnostics("item.first().answer.value").unwrap();
+        assert!(annotations.is_empty());
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(
+            diagnostics[0].code,
+            DiagnosticCode::ExpressionNotAttributable
+        );
     }
 }

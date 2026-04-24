@@ -13,7 +13,10 @@ fn collect_link_id_references(node: &AstNode) -> Vec<(String, Span)> {
 
 fn collect_link_ids_recursive(node: &AstNode, out: &mut Vec<(String, Span)>) {
     // Try to decompose this node as a chain and extract linkIds from where() steps
-    if node.node_type == "InvocationExpression" || node.node_type == "TermExpression" {
+    if matches!(
+        node.node_type,
+        "InvocationExpression" | "TermExpression" | "IndexerExpression"
+    ) {
         if let Some(steps) = decompose_chain(node) {
             for step in &steps {
                 if let ChainStepKind::Function {
