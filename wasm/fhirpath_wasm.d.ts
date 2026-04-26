@@ -1,4 +1,10 @@
-/** Byte offset range within the original FHIRPath expression string. */
+/**
+ * UTF-16 code-unit offset range within the original FHIRPath expression string.
+ *
+ * Indices are aligned with JavaScript string semantics, so they can be passed
+ * directly to `String.prototype.slice`, `substring`, or CodeMirror / Monaco
+ * position APIs without further translation.
+ */
 export interface Span {
   start: number;
   end: number;

@@ -3,6 +3,7 @@ pub mod bindings;
 pub mod lexer;
 pub mod parser;
 pub mod resolve;
+pub mod utf16;
 
 pub use lexer::{Token, TokenKind};
 pub use parser::AstNode;
