@@ -3,6 +3,26 @@
 use wasm_bindgen::prelude::*;
 
 use crate::analyze;
+use crate::utf16::byte_to_utf16_offset;
+
+/// Translate a span's byte offsets into UTF-16 code-unit offsets so JS hosts
+/// can use them directly for `String.slice`, CodeMirror diagnostics, etc.
+fn convert_span(span: &mut analyze::Span, expr: &str) {
+    span.start = byte_to_utf16_offset(expr, span.start);
+    span.end = byte_to_utf16_offset(expr, span.end);
+}
+
+fn convert_annotation_spans(annotations: &mut [analyze::Annotation], expr: &str) {
+    for ann in annotations.iter_mut() {
+        convert_span(&mut ann.span, expr);
+    }
+}
+
+fn convert_diagnostic_spans(diagnostics: &mut [analyze::Diagnostic], expr: &str) {
+    for diag in diagnostics.iter_mut() {
+        convert_span(&mut diag.span, expr);
+    }
+}
 
 /// Parse a FHIRPath expression string into an AST.
 ///
@@ -16,11 +36,14 @@ pub fn parse(expr: &str) -> Result<JsValue, JsError> {
 /// Annotate a FHIRPath expression, extracting answer references,
 /// item references, and coded values.
 ///
-/// Returns `Annotation[]` as a JavaScript value.
+/// Returns `Annotation[]` as a JavaScript value. Span offsets are
+/// UTF-16 code units, suitable for `String.prototype.slice` and
+/// CodeMirror/Monaco position math.
 #[wasm_bindgen]
 pub fn annotate_expression(expr: &str) -> Result<JsValue, JsError> {
-    let annotations =
+    let mut annotations =
         analyze::annotate_expression(expr).map_err(|e| JsError::new(&e.to_string()))?;
+    convert_annotation_spans(&mut annotations, expr);
     serde_wasm_bindgen::to_value(&annotations).map_err(|e| JsError::new(&e.to_string()))
 }
 
@@ -66,6 +89,8 @@ pub fn resolve_context(expr: &str, base_expr: &str) -> Result<String, JsError> {
 /// Analyze a FHIRPath expression in the context of a Questionnaire.
 ///
 /// Returns `{ annotations: Annotation[], diagnostics: Diagnostic[] }`.
+/// Span offsets are UTF-16 code units, suitable for
+/// `String.prototype.slice` and CodeMirror/Monaco position math.
 ///
 /// - `expr` -- the FHIRPath expression string
 /// - `index` -- a `QuestionnaireIndex` built from the Questionnaire
@@ -82,7 +107,9 @@ pub fn analyze_expression(
         scope_link_id,
         parent_context_expr,
     };
-    let result = analyze::analyze_expression(expr, &index.inner, &context)
+    let mut result = analyze::analyze_expression(expr, &index.inner, &context)
         .map_err(|e| JsError::new(&e.to_string()))?;
+    convert_annotation_spans(&mut result.annotations, expr);
+    convert_diagnostic_spans(&mut result.diagnostics, expr);
     serde_wasm_bindgen::to_value(&result).map_err(|e| JsError::new(&e.to_string()))
 }
