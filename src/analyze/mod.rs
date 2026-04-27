@@ -192,6 +192,45 @@ pub enum DiagnosticCode {
     ItemReferenceTargetsLeaf,
     ContextUnreachableFromParent,
     ExpressionNotAttributable,
+    ExpressionTypeMismatch,
+    ExpressionCardinalityMismatch,
+}
+
+/// Inferred result type of a FHIRPath expression.
+///
+/// Conservative — when inference cannot determine the type with confidence,
+/// returns `Unknown`. Unknown is silent: it never produces a mismatch
+/// diagnostic, only a *known* type that contradicts the expected type does.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum InferredType {
+    Boolean,
+    String,
+    Integer,
+    Decimal,
+    Date,
+    DateTime,
+    Time,
+    Quantity,
+    Coding,
+    Unknown,
+}
+
+/// Inferred cardinality of a FHIRPath expression result.
+///
+/// Three-state: `Singleton` (provably 0..1), `Collection` (could yield more
+/// than one), or `Unknown` (could not determine). Same conservative-silent-
+/// on-Unknown rule as [`InferredType`] — a definite mismatch produces an
+/// `ExpressionCardinalityMismatch` diagnostic.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Cardinality {
+    /// At most one element (0..1 or 1..1).
+    Singleton,
+    /// Possibly more than one element.
+    Collection,
+    /// Could not be determined.
+    Unknown,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
@@ -216,6 +255,18 @@ pub struct AnalysisContext {
     /// When provided, validates that item references in this expression
     /// are reachable from the parent scope's target.
     pub parent_context_expr: Option<String>,
+
+    /// Expected result type of the expression.
+    /// When set, the analyzer infers the expression's result type and emits
+    /// `ExpressionTypeMismatch` if inference produces a definite, conflicting
+    /// type. `Unknown` results never produce a diagnostic.
+    pub expected_result_type: Option<InferredType>,
+
+    /// Expected cardinality of the expression's result.
+    /// When set, the analyzer infers the expression's cardinality and emits
+    /// `ExpressionCardinalityMismatch` if inference produces a definite,
+    /// conflicting cardinality. `Unknown` results never produce a diagnostic.
+    pub expected_cardinality: Option<Cardinality>,
 }
 
 /// Result of analyzing a FHIRPath expression.
@@ -239,7 +290,7 @@ pub fn analyze_expression(
     index: &questionnaire_index::QuestionnaireIndex,
     context: &AnalysisContext,
 ) -> Result<ExpressionAnalysis, crate::ParseError> {
-    let (ann, mut diagnostics) = annotations::annotate_expression_with_diagnostics(expr)?;
+    let (ast, ann, mut diagnostics) = annotations::annotate_expression_with_ast(expr)?;
 
     // 1. LinkId validation — applies to ALL expressions
     diagnostics.extend(validate_link_ids::validate_link_ids_from_expr(
@@ -261,10 +312,75 @@ pub fn analyze_expression(
         index,
     )?);
 
+    // 4. Result-type inference — only when caller declares an expected type.
+    //    Silent on `Unknown` (conservative); fires only on definite mismatch.
+    if let Some(expected) = context.expected_result_type {
+        let inferred = result_type::infer_result_type(&ast, &ann, index);
+        if inferred != InferredType::Unknown && inferred != expected {
+            diagnostics.push(Diagnostic {
+                span: Span {
+                    start: ast.byte_start,
+                    end: ast.byte_end,
+                },
+                severity: Severity::Error,
+                code: DiagnosticCode::ExpressionTypeMismatch,
+                message: format!(
+                    "Expression evaluates to {} but {} was expected",
+                    inferred_type_name(inferred),
+                    inferred_type_name(expected),
+                ),
+            });
+        }
+    }
+
+    // 5. Cardinality inference — same shape as type inference. Mismatch only
+    //    fires when both expected and inferred are definite and disagree.
+    if let Some(expected) = context.expected_cardinality {
+        let inferred = result_type::infer_cardinality(&ast, &ann, index);
+        if inferred != Cardinality::Unknown && inferred != expected {
+            diagnostics.push(Diagnostic {
+                span: Span {
+                    start: ast.byte_start,
+                    end: ast.byte_end,
+                },
+                severity: Severity::Error,
+                code: DiagnosticCode::ExpressionCardinalityMismatch,
+                message: format!(
+                    "Expression yields {} but {} was expected",
+                    cardinality_name(inferred),
+                    cardinality_name(expected),
+                ),
+            });
+        }
+    }
+
     Ok(ExpressionAnalysis {
         annotations: ann,
         diagnostics,
     })
+}
+
+fn cardinality_name(c: Cardinality) -> &'static str {
+    match c {
+        Cardinality::Singleton => "a singleton",
+        Cardinality::Collection => "a collection",
+        Cardinality::Unknown => "unknown",
+    }
+}
+
+fn inferred_type_name(t: InferredType) -> &'static str {
+    match t {
+        InferredType::Boolean => "Boolean",
+        InferredType::String => "String",
+        InferredType::Integer => "Integer",
+        InferredType::Decimal => "Decimal",
+        InferredType::Date => "Date",
+        InferredType::DateTime => "DateTime",
+        InferredType::Time => "Time",
+        InferredType::Quantity => "Quantity",
+        InferredType::Coding => "Coding",
+        InferredType::Unknown => "Unknown",
+    }
 }
 
 // ── Internal modules ────────────────────────────────────────────────────
@@ -273,6 +389,7 @@ pub mod annotations;
 pub mod completions;
 pub mod questionnaire_index;
 
+pub(crate) mod result_type;
 pub(crate) mod validate_context;
 pub(crate) mod validate_link_ids;
 pub(crate) mod validate_types;
@@ -441,5 +558,159 @@ mod tests {
         ).unwrap();
         assert!(result.annotations.is_empty());
         assert!(result.diagnostics.is_empty());
+    }
+
+    // ── expected_result_type ──
+
+    #[test]
+    fn expected_boolean_definite_mismatch_emits_diagnostic() {
+        let idx = QuestionnaireIndex::build(&questionnaire());
+        let result = analyze_expression(
+            "1 + 1",
+            &idx,
+            &AnalysisContext {
+                expected_result_type: Some(InferredType::Boolean),
+                ..Default::default()
+            },
+        ).unwrap();
+        assert!(result
+            .diagnostics
+            .iter()
+            .any(|d| d.code == DiagnosticCode::ExpressionTypeMismatch));
+    }
+
+    #[test]
+    fn expected_boolean_match_no_diagnostic() {
+        let idx = QuestionnaireIndex::build(&questionnaire());
+        let result = analyze_expression(
+            "item.where(linkId='bool1').answer.value",
+            &idx,
+            &AnalysisContext {
+                expected_result_type: Some(InferredType::Boolean),
+                ..Default::default()
+            },
+        ).unwrap();
+        assert!(result
+            .diagnostics
+            .iter()
+            .all(|d| d.code != DiagnosticCode::ExpressionTypeMismatch));
+    }
+
+    #[test]
+    fn expected_boolean_unknown_is_silent() {
+        let idx = QuestionnaireIndex::build(&questionnaire());
+        let result = analyze_expression(
+            "Patient.name.given",
+            &idx,
+            &AnalysisContext {
+                expected_result_type: Some(InferredType::Boolean),
+                ..Default::default()
+            },
+        ).unwrap();
+        assert!(result
+            .diagnostics
+            .iter()
+            .all(|d| d.code != DiagnosticCode::ExpressionTypeMismatch));
+    }
+
+    #[test]
+    fn no_expected_type_no_inference_diagnostic() {
+        let idx = QuestionnaireIndex::build(&questionnaire());
+        let result = analyze_expression(
+            "1 + 1",
+            &idx,
+            &AnalysisContext::default(),
+        ).unwrap();
+        assert!(result
+            .diagnostics
+            .iter()
+            .all(|d| d.code != DiagnosticCode::ExpressionTypeMismatch));
+    }
+
+    // ── expected_cardinality ──
+
+    fn questionnaire_with_repeats() -> serde_json::Value {
+        json!({
+            "resourceType": "Questionnaire",
+            "item": [
+                { "linkId": "bool1", "type": "boolean" },
+                { "linkId": "multi", "type": "choice", "repeats": true },
+            ]
+        })
+    }
+
+    #[test]
+    fn expected_singleton_collection_emits_diagnostic() {
+        let idx = QuestionnaireIndex::build(&questionnaire_with_repeats());
+        let result = analyze_expression(
+            "item.where(linkId='multi').answer.value",
+            &idx,
+            &AnalysisContext {
+                expected_cardinality: Some(Cardinality::Singleton),
+                ..Default::default()
+            },
+        ).unwrap();
+        assert!(result
+            .diagnostics
+            .iter()
+            .any(|d| d.code == DiagnosticCode::ExpressionCardinalityMismatch));
+    }
+
+    #[test]
+    fn expected_singleton_match_no_diagnostic() {
+        let idx = QuestionnaireIndex::build(&questionnaire_with_repeats());
+        let result = analyze_expression(
+            "item.where(linkId='bool1').answer.value",
+            &idx,
+            &AnalysisContext {
+                expected_cardinality: Some(Cardinality::Singleton),
+                ..Default::default()
+            },
+        ).unwrap();
+        assert!(result
+            .diagnostics
+            .iter()
+            .all(|d| d.code != DiagnosticCode::ExpressionCardinalityMismatch));
+    }
+
+    #[test]
+    fn expected_singleton_unknown_is_silent() {
+        let idx = QuestionnaireIndex::build(&questionnaire_with_repeats());
+        let result = analyze_expression(
+            "Patient.name.given",
+            &idx,
+            &AnalysisContext {
+                expected_cardinality: Some(Cardinality::Singleton),
+                ..Default::default()
+            },
+        ).unwrap();
+        assert!(result
+            .diagnostics
+            .iter()
+            .all(|d| d.code != DiagnosticCode::ExpressionCardinalityMismatch));
+    }
+
+    #[test]
+    fn enable_when_style_check_combines_type_and_cardinality() {
+        // Realistic enableWhenExpression validation: must be a singleton boolean.
+        let idx = QuestionnaireIndex::build(&questionnaire_with_repeats());
+        let result = analyze_expression(
+            "item.where(linkId='multi').answer.value",
+            &idx,
+            &AnalysisContext {
+                expected_result_type: Some(InferredType::Boolean),
+                expected_cardinality: Some(Cardinality::Singleton),
+                ..Default::default()
+            },
+        ).unwrap();
+        // Multi-choice yields Coding (not Boolean) and Collection (not Singleton).
+        assert!(result
+            .diagnostics
+            .iter()
+            .any(|d| d.code == DiagnosticCode::ExpressionTypeMismatch));
+        assert!(result
+            .diagnostics
+            .iter()
+            .any(|d| d.code == DiagnosticCode::ExpressionCardinalityMismatch));
     }
 }

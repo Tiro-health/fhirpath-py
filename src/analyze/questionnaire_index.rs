@@ -5,6 +5,9 @@ pub struct QuestionnaireItemInfo {
     pub link_id: String,
     pub text: String,
     pub item_type: String,
+    /// `true` if the item is declared `repeats: true` in the Questionnaire.
+    /// Drives cardinality inference for answer-leaf chains.
+    pub repeats: bool,
     pub answer_options: HashMap<(String, String), String>, // (system, code) -> display
     pub parent_link_id: Option<String>,
     pub children: Vec<String>,
@@ -59,6 +62,10 @@ impl QuestionnaireIndex {
                 .and_then(|v| v.as_str())
                 .unwrap_or("group")
                 .to_string();
+            let repeats = item
+                .get("repeats")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
 
             self.items.insert(
                 link_id.clone(),
@@ -66,6 +73,7 @@ impl QuestionnaireIndex {
                     link_id: link_id.clone(),
                     text,
                     item_type,
+                    repeats,
                     answer_options,
                     parent_link_id: parent_link_id.map(|s| s.to_string()),
                     children: Vec::new(),
@@ -107,6 +115,35 @@ impl QuestionnaireIndex {
 
     pub fn resolve_item_type(&self, link_id: &str) -> Option<&str> {
         self.items.get(link_id).map(|i| i.item_type.as_str())
+    }
+
+    /// Whether the item allows multiple answers (`repeats: true`).
+    /// Returns `None` when the linkId is unknown.
+    pub fn resolve_item_repeats(&self, link_id: &str) -> Option<bool> {
+        self.items.get(link_id).map(|i| i.repeats)
+    }
+
+    /// Whether *any* item on the path from `link_id` up to the root has
+    /// `repeats: true`. Used to detect answer chains that flatten across
+    /// repeating-group instances.
+    pub fn has_repeating_ancestor(&self, link_id: &str) -> bool {
+        let mut current = match self.items.get(link_id) {
+            Some(i) => i.parent_link_id.as_deref(),
+            None => return false,
+        };
+        for _ in 0..100 {
+            let Some(parent_id) = current else {
+                return false;
+            };
+            let Some(parent) = self.items.get(parent_id) else {
+                return false;
+            };
+            if parent.repeats {
+                return true;
+            }
+            current = parent.parent_link_id.as_deref();
+        }
+        false
     }
 
     /// Check if `descendant` is a child/grandchild/... of `ancestor`.

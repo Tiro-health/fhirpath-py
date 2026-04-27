@@ -4,7 +4,8 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 
 use crate::analyze::{
-    self, AnnotationKind, Attribution, DiagnosticCode, Severity, ValueAccessor,
+    self, AnnotationKind, Attribution, Cardinality, DiagnosticCode, InferredType, Severity,
+    ValueAccessor,
 };
 use crate::lexer::Token;
 use crate::AstNode;
@@ -174,6 +175,8 @@ fn diagnostic_code_to_str(code: &DiagnosticCode) -> &'static str {
         DiagnosticCode::ItemReferenceTargetsLeaf => "item_reference_targets_leaf",
         DiagnosticCode::ContextUnreachableFromParent => "context_unreachable_from_parent",
         DiagnosticCode::ExpressionNotAttributable => "expression_not_attributable",
+        DiagnosticCode::ExpressionTypeMismatch => "expression_type_mismatch",
+        DiagnosticCode::ExpressionCardinalityMismatch => "expression_cardinality_mismatch",
     }
 }
 
@@ -260,20 +263,69 @@ fn resolve_context(expr: &str, base_expr: &str) -> PyResult<String> {
         .map_err(|e| pyo3::exceptions::PySyntaxError::new_err(e.0))
 }
 
+/// Map an `InferredType` snake_case string to the enum.
+fn parse_inferred_type(s: &str) -> Option<InferredType> {
+    match s {
+        "boolean" => Some(InferredType::Boolean),
+        "string" => Some(InferredType::String),
+        "integer" => Some(InferredType::Integer),
+        "decimal" => Some(InferredType::Decimal),
+        "date" => Some(InferredType::Date),
+        "date_time" | "datetime" => Some(InferredType::DateTime),
+        "time" => Some(InferredType::Time),
+        "quantity" => Some(InferredType::Quantity),
+        "coding" => Some(InferredType::Coding),
+        "unknown" => Some(InferredType::Unknown),
+        _ => None,
+    }
+}
+
+/// Map a `Cardinality` snake_case string to the enum.
+fn parse_cardinality(s: &str) -> Option<Cardinality> {
+    match s {
+        "singleton" => Some(Cardinality::Singleton),
+        "collection" => Some(Cardinality::Collection),
+        "unknown" => Some(Cardinality::Unknown),
+        _ => None,
+    }
+}
+
 /// Analyze a FHIRPath expression against a QuestionnaireIndex, returning
 /// annotations and diagnostics.
 #[pyfunction]
-#[pyo3(signature = (expr, index, context_link_id=None, parent_context_expr=None))]
+#[pyo3(signature = (expr, index, context_link_id=None, parent_context_expr=None, expected_result_type=None, expected_cardinality=None))]
 fn analyze_expression(
     py: Python<'_>,
     expr: &str,
     index: &PyQuestionnaireIndex,
     context_link_id: Option<&str>,
     parent_context_expr: Option<&str>,
+    expected_result_type: Option<&str>,
+    expected_cardinality: Option<&str>,
 ) -> PyResult<PyObject> {
+    let expected = match expected_result_type {
+        Some(s) => Some(parse_inferred_type(s).ok_or_else(|| {
+            pyo3::exceptions::PyValueError::new_err(format!(
+                "unknown expected_result_type: {}",
+                s
+            ))
+        })?),
+        None => None,
+    };
+    let expected_card = match expected_cardinality {
+        Some(s) => Some(parse_cardinality(s).ok_or_else(|| {
+            pyo3::exceptions::PyValueError::new_err(format!(
+                "unknown expected_cardinality: {}",
+                s
+            ))
+        })?),
+        None => None,
+    };
     let context = analyze::AnalysisContext {
         scope_link_id: context_link_id.map(|s| s.to_string()),
         parent_context_expr: parent_context_expr.map(|s| s.to_string()),
+        expected_result_type: expected,
+        expected_cardinality: expected_card,
     };
     let result = analyze::analyze_expression(expr, &index.inner, &context)
         .map_err(|e| pyo3::exceptions::PySyntaxError::new_err(e.0))?;

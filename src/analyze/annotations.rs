@@ -961,6 +961,16 @@ pub fn annotate_expression(expr: &str) -> Result<Vec<Annotation>, crate::ParseEr
 pub(crate) fn annotate_expression_with_diagnostics(
     expr: &str,
 ) -> Result<(Vec<Annotation>, Vec<Diagnostic>), crate::ParseError> {
+    let (_ast, anns, diags) = annotate_expression_with_ast(expr)?;
+    Ok((anns, diags))
+}
+
+/// Variant of [`annotate_expression`] that also returns the parsed AST and
+/// diagnostics. The orchestrator reuses the AST for downstream passes
+/// (notably `result_type::infer_result_type`) instead of reparsing.
+pub(crate) fn annotate_expression_with_ast(
+    expr: &str,
+) -> Result<(AstNode, Vec<Annotation>, Vec<Diagnostic>), crate::ParseError> {
     let tokens = crate::lexer::tokenize(expr).map_err(crate::ParseError)?;
     let mut p = crate::parser::Parser::new(&tokens);
     let root = p.parse_entire_expression().map_err(crate::ParseError)?;
@@ -974,7 +984,7 @@ pub(crate) fn annotate_expression_with_diagnostics(
 
     let mut all: Vec<Annotation> = answer_refs.into_iter().chain(coded_values).collect();
     all.sort_by_key(|a| a.span.start);
-    Ok((all, diagnostics))
+    Ok((root, all, diagnostics))
 }
 
 // ── Tests ───────────────────────────────────────────────────────────────
