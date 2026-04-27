@@ -16,6 +16,10 @@ pub struct QuestionnaireItemInfo {
 #[derive(Debug, Default)]
 pub struct QuestionnaireIndex {
     items: HashMap<String, QuestionnaireItemInfo>,
+    /// Top-level item linkIds in document order. Iterating the `items`
+    /// HashMap doesn't preserve order, so we keep a parallel list to drive
+    /// deterministic suggestion output.
+    root_link_ids: Vec<String>,
 }
 
 impl QuestionnaireIndex {
@@ -27,6 +31,11 @@ impl QuestionnaireIndex {
             index.walk(items, None);
         }
         index
+    }
+
+    /// Top-level item linkIds in document order.
+    pub fn roots(&self) -> &[String] {
+        &self.root_link_ids
     }
 
     fn walk(&mut self, items: &[serde_json::Value], parent_link_id: Option<&str>) {
@@ -80,11 +89,13 @@ impl QuestionnaireIndex {
                 },
             );
 
-            // Update parent's children vec
+            // Update parent's children vec, or record this as a root.
             if let Some(pid) = parent_link_id {
                 if let Some(parent) = self.items.get_mut(pid) {
                     parent.children.push(link_id.clone());
                 }
+            } else {
+                self.root_link_ids.push(link_id.clone());
             }
 
             if let Some(sub_items) = item.get("item").and_then(|v| v.as_array()) {
