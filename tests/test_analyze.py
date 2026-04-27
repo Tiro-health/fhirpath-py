@@ -430,3 +430,36 @@ def analyze_expression_not_attributable_test():
     assert diag["severity"] == "info"
     # No annotation because the chain is unattributable.
     assert result["annotations"] == []
+
+
+# ── Inferred type / cardinality (UI metadata) ──────────────────────────
+
+
+def analyze_returns_inferred_type_and_cardinality_test():
+    idx = QuestionnaireIndex(QUESTIONNAIRE_JSON)
+    result = analyze_expression(
+        "item.where(linkId='bool1').answer.value",
+        idx,
+    )
+    assert result["inferred_type"] == "boolean"
+    assert result["inferred_cardinality"] == "singleton"
+
+
+def analyze_returns_unknown_when_inference_cannot_determine_test():
+    idx = QuestionnaireIndex(QUESTIONNAIRE_JSON)
+    result = analyze_expression("Patient.name.given", idx)
+    assert result["inferred_type"] == "unknown"
+    assert result["inferred_cardinality"] == "unknown"
+
+
+def analyze_inferred_fields_present_alongside_diagnostics_test():
+    idx = QuestionnaireIndex(QUESTIONNAIRE_JSON)
+    result = analyze_expression(
+        "item.where(linkId='bool1').answer.value",
+        idx,
+        expected_result_type="string",
+    )
+    # Validation diagnostic still fires...
+    assert any(d["code"] == "expression_type_mismatch" for d in result["diagnostics"])
+    # ...and the inferred values are still surfaced for UI use.
+    assert result["inferred_type"] == "boolean"

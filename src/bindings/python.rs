@@ -263,6 +263,29 @@ fn resolve_context(expr: &str, base_expr: &str) -> PyResult<String> {
         .map_err(|e| pyo3::exceptions::PySyntaxError::new_err(e.0))
 }
 
+fn inferred_type_to_str(t: &InferredType) -> &'static str {
+    match t {
+        InferredType::Boolean => "boolean",
+        InferredType::String => "string",
+        InferredType::Integer => "integer",
+        InferredType::Decimal => "decimal",
+        InferredType::Date => "date",
+        InferredType::DateTime => "date_time",
+        InferredType::Time => "time",
+        InferredType::Quantity => "quantity",
+        InferredType::Coding => "coding",
+        InferredType::Unknown => "unknown",
+    }
+}
+
+fn cardinality_to_str(c: &Cardinality) -> &'static str {
+    match c {
+        Cardinality::Singleton => "singleton",
+        Cardinality::Collection => "collection",
+        Cardinality::Unknown => "unknown",
+    }
+}
+
 /// Map an `InferredType` snake_case string to the enum.
 fn parse_inferred_type(s: &str) -> Option<InferredType> {
     match s {
@@ -344,6 +367,11 @@ fn analyze_expression(
     let dict = PyDict::new(py);
     dict.set_item("annotations", PyList::new(py, annotations)?)?;
     dict.set_item("diagnostics", PyList::new(py, diagnostics)?)?;
+    dict.set_item("inferred_type", inferred_type_to_str(&result.inferred_type))?;
+    dict.set_item(
+        "inferred_cardinality",
+        cardinality_to_str(&result.inferred_cardinality),
+    )?;
     Ok(dict.into())
 }
 

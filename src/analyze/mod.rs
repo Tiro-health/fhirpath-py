@@ -274,6 +274,13 @@ pub struct AnalysisContext {
 pub struct ExpressionAnalysis {
     pub annotations: Vec<Annotation>,
     pub diagnostics: Vec<Diagnostic>,
+    /// Inferred result type of the expression. `Unknown` when inference
+    /// cannot determine the type with confidence — UI hosts should treat
+    /// it as "no information" rather than "any type".
+    pub inferred_type: InferredType,
+    /// Inferred cardinality of the expression's result. `Unknown` when
+    /// inference cannot determine the cardinality with confidence.
+    pub inferred_cardinality: Cardinality,
 }
 
 /// Analyze a FHIRPath expression in the context of a Questionnaire.
@@ -312,11 +319,15 @@ pub fn analyze_expression(
         index,
     )?);
 
-    // 4. Result-type inference — only when caller declares an expected type.
-    //    Silent on `Unknown` (conservative); fires only on definite mismatch.
+    // 4. Result-type and cardinality inference — always run so callers can
+    //    use the values for UI metadata (hover, badges, …). Diagnostics fire
+    //    only when an expected_* is set and inference produces a definite,
+    //    conflicting result. `Unknown` is silent.
+    let inferred_type = result_type::infer_result_type(&ast, &ann, index);
+    let inferred_cardinality = result_type::infer_cardinality(&ast, &ann, index);
+
     if let Some(expected) = context.expected_result_type {
-        let inferred = result_type::infer_result_type(&ast, &ann, index);
-        if inferred != InferredType::Unknown && inferred != expected {
+        if inferred_type != InferredType::Unknown && inferred_type != expected {
             diagnostics.push(Diagnostic {
                 span: Span {
                     start: ast.byte_start,
@@ -326,18 +337,15 @@ pub fn analyze_expression(
                 code: DiagnosticCode::ExpressionTypeMismatch,
                 message: format!(
                     "Expression evaluates to {} but {} was expected",
-                    inferred_type_name(inferred),
+                    inferred_type_name(inferred_type),
                     inferred_type_name(expected),
                 ),
             });
         }
     }
 
-    // 5. Cardinality inference — same shape as type inference. Mismatch only
-    //    fires when both expected and inferred are definite and disagree.
     if let Some(expected) = context.expected_cardinality {
-        let inferred = result_type::infer_cardinality(&ast, &ann, index);
-        if inferred != Cardinality::Unknown && inferred != expected {
+        if inferred_cardinality != Cardinality::Unknown && inferred_cardinality != expected {
             diagnostics.push(Diagnostic {
                 span: Span {
                     start: ast.byte_start,
@@ -347,7 +355,7 @@ pub fn analyze_expression(
                 code: DiagnosticCode::ExpressionCardinalityMismatch,
                 message: format!(
                     "Expression yields {} but {} was expected",
-                    cardinality_name(inferred),
+                    cardinality_name(inferred_cardinality),
                     cardinality_name(expected),
                 ),
             });
@@ -357,6 +365,8 @@ pub fn analyze_expression(
     Ok(ExpressionAnalysis {
         annotations: ann,
         diagnostics,
+        inferred_type,
+        inferred_cardinality,
     })
 }
 
@@ -688,6 +698,32 @@ mod tests {
             .diagnostics
             .iter()
             .all(|d| d.code != DiagnosticCode::ExpressionCardinalityMismatch));
+    }
+
+    // ── inferred_type / inferred_cardinality on result ──
+
+    #[test]
+    fn result_exposes_inferred_type_and_cardinality_without_expectations() {
+        let idx = QuestionnaireIndex::build(&questionnaire_with_repeats());
+        let result = analyze_expression(
+            "item.where(linkId='multi').answer.value",
+            &idx,
+            &AnalysisContext::default(),
+        ).unwrap();
+        assert_eq!(result.inferred_type, InferredType::Coding);
+        assert_eq!(result.inferred_cardinality, Cardinality::Collection);
+    }
+
+    #[test]
+    fn result_exposes_unknown_when_inference_cannot_determine() {
+        let idx = QuestionnaireIndex::build(&questionnaire());
+        let result = analyze_expression(
+            "Patient.name.given",
+            &idx,
+            &AnalysisContext::default(),
+        ).unwrap();
+        assert_eq!(result.inferred_type, InferredType::Unknown);
+        assert_eq!(result.inferred_cardinality, Cardinality::Unknown);
     }
 
     #[test]
