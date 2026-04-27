@@ -24,6 +24,9 @@ pub struct CompletionItem {
 // ── Context resolution ─────────────────────────────────────────────────
 
 enum ContextPosition {
+    /// Top of the QuestionnaireResponse — the user typed just `%resource`
+    /// (or `%context`) and wants to start drilling into items.
+    Root,
     ItemFiltered(String),
     Answer(String),
 }
@@ -40,6 +43,10 @@ fn resolve_context(expr: &str) -> Result<Option<ContextPosition>, crate::ParseEr
 
     enum State {
         Start,
+        /// Saw `%resource` / `%context` at the head of the chain with nothing
+        /// after it yet. Equivalent to Start for navigation, but distinguished
+        /// so a chain that ends here can emit root-level suggestions.
+        AtRoot,
         Item,
         ItemFiltered(String),
         Answer(String),
@@ -49,8 +56,16 @@ fn resolve_context(expr: &str) -> Result<Option<ContextPosition>, crate::ParseEr
 
     for step in &steps {
         state = match (&state, &step.kind) {
-            (State::Start, ChainStepKind::External) => State::Start,
-            (State::Start, ChainStepKind::Identifier(name)) if name == "item" => State::Item,
+            // Only %resource and %context are transparent QR-aliases — see
+            // annotations.rs for the same restriction.
+            (State::Start, ChainStepKind::External(name))
+                if name == "resource" || name == "context" =>
+            {
+                State::AtRoot
+            }
+            (State::Start | State::AtRoot, ChainStepKind::Identifier(name)) if name == "item" => {
+                State::Item
+            }
             (
                 State::Item,
                 ChainStepKind::Function {
@@ -71,6 +86,7 @@ fn resolve_context(expr: &str) -> Result<Option<ContextPosition>, crate::ParseEr
     }
 
     match state {
+        State::AtRoot => Ok(Some(ContextPosition::Root)),
         State::ItemFiltered(id) => Ok(Some(ContextPosition::ItemFiltered(id))),
         State::Answer(id) => Ok(Some(ContextPosition::Answer(id))),
         _ => Ok(None),
@@ -218,6 +234,12 @@ pub fn generate_completions(
     let mut counter: usize = 0;
 
     match position {
+        ContextPosition::Root => {
+            for child_id in index.roots() {
+                let prefix = format!("item.where(linkId='{child_id}')");
+                emit_subtree(index, child_id, &prefix, &[], &mut counter, &mut out);
+            }
+        }
         ContextPosition::ItemFiltered(ref link_id) => {
             let Some(info) = index.get(link_id) else {
                 return Ok(Vec::new());
@@ -493,6 +515,46 @@ mod tests {
         assert!(!items.is_empty());
         let texts: Vec<&str> = items.iter().map(|c| c.insert_text.as_str()).collect();
         assert!(texts.contains(&"item.where(linkId='choice1').answer.value"));
+    }
+
+    #[test]
+    fn test_resource_alone_emits_top_level_items() {
+        let idx = QuestionnaireIndex::build(&questionnaire());
+        let items = generate_completions(&idx, "%resource").unwrap();
+
+        assert!(!items.is_empty());
+        let texts: Vec<&str> = items.iter().map(|c| c.insert_text.as_str()).collect();
+        // Top-level group: descend through children (group itself has no value).
+        assert!(texts.contains(&"item.where(linkId='group1').item.where(linkId='choice1').answer.value"));
+        // Top-level coding item: own answer.value plus child completions.
+        assert!(texts.contains(&"item.where(linkId='coding-with-children').answer.value"));
+        assert!(texts.contains(&"item.where(linkId='coding-with-children').answer.value.code"));
+    }
+
+    #[test]
+    fn test_context_alone_emits_top_level_items() {
+        let idx = QuestionnaireIndex::build(&questionnaire());
+        let items = generate_completions(&idx, "%context").unwrap();
+        assert!(!items.is_empty());
+        let texts: Vec<&str> = items.iter().map(|c| c.insert_text.as_str()).collect();
+        assert!(texts.contains(&"item.where(linkId='coding-with-children').answer.value"));
+    }
+
+    #[test]
+    fn test_questionnaire_external_returns_empty() {
+        // %questionnaire points at the Questionnaire structure, not the QR —
+        // suggesting QR-shaped completions there would be misleading.
+        let idx = QuestionnaireIndex::build(&questionnaire());
+        let items =
+            generate_completions(&idx, "%questionnaire.item.where(linkId='group1')").unwrap();
+        assert!(items.is_empty());
+    }
+
+    #[test]
+    fn test_unknown_external_alone_returns_empty() {
+        let idx = QuestionnaireIndex::build(&questionnaire());
+        let items = generate_completions(&idx, "%questionnaire").unwrap();
+        assert!(items.is_empty());
     }
 
     #[test]

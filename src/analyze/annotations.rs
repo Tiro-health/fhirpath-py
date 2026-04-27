@@ -26,7 +26,11 @@ pub(crate) enum ChainStepKind {
         /// Used to reason about cardinality in composite positional ops.
         integer_arg: Option<i64>,
     },
-    External,
+    /// FHIRPath external constant (`%name`). The state machine only treats
+    /// `%resource` and `%context` as transparent QR-aliases; other names
+    /// (e.g. `%questionnaire`, `%ucum`) point at unrelated resources and
+    /// must not silently inherit QR navigation semantics.
+    External(String),
     /// `$this` / `$index` / `$total` — FHIRPath context variables.
     /// The specific identity is currently only used for debugging; the state
     /// machine treats all three as transparent pass-throughs at Start.
@@ -214,9 +218,9 @@ pub(crate) fn decompose_chain(node: &AstNode) -> Option<Vec<ChainStep>> {
                         return None;
                     }
                     let ident = ext_const.children.first()?;
-                    let _name = get_identifier_name(ident)?;
+                    let name = get_identifier_name(ident)?.to_string();
                     Some(vec![ChainStep {
-                        kind: ChainStepKind::External,
+                        kind: ChainStepKind::External(name),
                         link_id_span: None,
                     }])
                 }
@@ -491,8 +495,16 @@ fn transition(mut state: SelectionState, step: &ChainStep) -> SelectionState {
     }
 
     let next_anchor = match (&state.anchor, &step.kind) {
-        // External constants (%context, %resource, %factory...) stay at Start.
-        (Anchor::Start, ChainStepKind::External) => Anchor::Start,
+        // Only %resource and %context are transparent QR-aliases. Other
+        // externals (%questionnaire, %ucum, %vs-*, …) point at unrelated
+        // resources, so any subsequent navigation is not QR navigation and
+        // must not produce QR-style annotations.
+        (Anchor::Start, ChainStepKind::External(name))
+            if name == "resource" || name == "context" =>
+        {
+            Anchor::Start
+        }
+        (Anchor::Start, ChainStepKind::External(_)) => Anchor::Unattributable,
 
         // Context variables ($this / $index / $total) at Start stay at Start —
         // they're transparent pass-throughs for navigation recognition. Real
@@ -667,7 +679,15 @@ fn match_qr_path(steps: &[ChainStep]) -> MatchOutcome {
             ever_in_qr_scope = true;
         }
         if matches!(state.anchor, Anchor::Unattributable) {
-            return MatchOutcome::Unattributable;
+            // Only flag as Unattributable when the chain actually entered QR
+            // territory at some point — otherwise it's a non-QR chain (e.g.
+            // `%questionnaire.item.…` or `Patient.name`) and should fall
+            // through silently so the AST walker can recurse normally.
+            return if ever_in_qr_scope {
+                MatchOutcome::Unattributable
+            } else {
+                MatchOutcome::NotApplicable
+            };
         }
     }
 
