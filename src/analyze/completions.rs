@@ -19,6 +19,8 @@ pub struct CompletionItem {
     pub filter_text: String,
     pub sort_text: String,
     pub kind: CompletionItemKind,
+    pub link_id: String,
+    pub item_type: String,
 }
 
 // ── Context resolution ─────────────────────────────────────────────────
@@ -143,6 +145,8 @@ fn emit_value_completions(
         filter_text: filter_text.clone(),
         sort_text: format!("{:04}", *counter),
         kind: CompletionItemKind::Value,
+        link_id: link_id.to_string(),
+        item_type: item_type.to_string(),
     });
     *counter += 1;
 
@@ -154,6 +158,8 @@ fn emit_value_completions(
             filter_text: filter_text.clone(),
             sort_text: format!("{:04}", *counter),
             kind: CompletionItemKind::Code,
+            link_id: link_id.to_string(),
+            item_type: item_type.to_string(),
         });
         *counter += 1;
 
@@ -164,6 +170,8 @@ fn emit_value_completions(
             filter_text,
             sort_text: format!("{:04}", *counter),
             kind: CompletionItemKind::Display,
+            link_id: link_id.to_string(),
+            item_type: item_type.to_string(),
         });
         *counter += 1;
     }
@@ -611,5 +619,50 @@ mod tests {
             .find(|c| c.insert_text == "item.where(linkId='choice1').answer.value.display")
             .unwrap();
         assert_eq!(display.kind, CompletionItemKind::Display);
+    }
+
+    #[test]
+    fn test_link_id_and_item_type_match_target_item() {
+        let idx = QuestionnaireIndex::build(&questionnaire());
+        let items = generate_completions(&idx, "item.where(linkId='group1')").unwrap();
+
+        let bool_item = items
+            .iter()
+            .find(|c| c.insert_text == "item.where(linkId='bool1').answer.value")
+            .unwrap();
+        assert_eq!(bool_item.link_id, "bool1");
+        assert_eq!(bool_item.item_type, "boolean");
+    }
+
+    #[test]
+    fn test_coding_variants_share_link_id_and_item_type() {
+        let idx = QuestionnaireIndex::build(&questionnaire());
+        let items = generate_completions(&idx, "item.where(linkId='group1')").unwrap();
+
+        let variants: Vec<&CompletionItem> = items
+            .iter()
+            .filter(|c| c.link_id == "choice1")
+            .collect();
+        assert_eq!(variants.len(), 3);
+        for v in &variants {
+            assert_eq!(v.link_id, "choice1");
+            assert_eq!(v.item_type, "choice");
+        }
+    }
+
+    #[test]
+    fn test_nested_descent_uses_leaf_link_id() {
+        let idx = QuestionnaireIndex::build(&questionnaire());
+        let items = generate_completions(&idx, "item.where(linkId='group1')").unwrap();
+
+        let deep = items
+            .iter()
+            .find(|c| {
+                c.insert_text
+                    == "item.where(linkId='subgroup').item.where(linkId='deep-string').answer.value"
+            })
+            .unwrap();
+        assert_eq!(deep.link_id, "deep-string");
+        assert_eq!(deep.item_type, "string");
     }
 }

@@ -97,6 +97,25 @@ def questionnaire_index_invalid_json_test():
         QuestionnaireIndex("not valid json")
 
 
+def questionnaire_index_generate_completions_exposes_link_id_and_item_type_test():
+    idx = QuestionnaireIndex(QUESTIONNAIRE_JSON)
+    items = idx.generate_completions("item.where(linkId='group1')")
+    assert items, "expected at least one completion for a populated group"
+
+    bool_item = next(
+        item
+        for item in items
+        if item["insert_text"] == "item.where(linkId='bool1').answer.value"
+    )
+    assert bool_item["link_id"] == "bool1"
+    assert bool_item["item_type"] == "boolean"
+
+    choice_variants = [item for item in items if item["link_id"] == "choice1"]
+    assert len(choice_variants) == 3
+    for variant in choice_variants:
+        assert variant["item_type"] == "choice"
+
+
 # ── annotate_expression ────────────────────────────────────────────────
 
 

@@ -9,6 +9,7 @@
 
 ### Added
 
+- `CompletionItem` now exposes `link_id` and `item_type` fields (#51)
 - WASM target: `@tiro-health/fhirpath-wasm` via wasm-bindgen (#13)
 - Analysis API via PyO3: `annotate_expression()`, `analyze_expression()`, `QuestionnaireIndex` (#12)
 - SDC expression analysis with annotation extraction (#7)
