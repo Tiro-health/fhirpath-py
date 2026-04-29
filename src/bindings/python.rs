@@ -147,6 +147,7 @@ fn completion_item_to_pydict(py: Python<'_>, item: &analyze::CompletionItem) -> 
     dict.set_item("kind", completion_kind_to_str(&item.kind))?;
     dict.set_item("link_id", item.link_id.as_str())?;
     dict.set_item("item_type", item.item_type.as_str())?;
+    dict.set_item("traverses_repeating", item.traverses_repeating)?;
     Ok(dict.into())
 }
 
