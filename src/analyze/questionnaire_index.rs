@@ -157,6 +157,34 @@ impl QuestionnaireIndex {
         false
     }
 
+    /// Like `has_repeating_ancestor`, but stops the walk when it reaches
+    /// `anchor` (exclusive). Used by completions to flag only repeating
+    /// boundaries crossed by the *suggestion* — items strictly between
+    /// `link_id` and `anchor` — and ignore boundaries already crossed by
+    /// the user's typed prefix.
+    pub fn has_repeating_ancestor_until(&self, link_id: &str, anchor: &str) -> bool {
+        let mut current = match self.items.get(link_id) {
+            Some(i) => i.parent_link_id.as_deref(),
+            None => return false,
+        };
+        for _ in 0..100 {
+            let Some(parent_id) = current else {
+                return false;
+            };
+            if parent_id == anchor {
+                return false;
+            }
+            let Some(parent) = self.items.get(parent_id) else {
+                return false;
+            };
+            if parent.repeats {
+                return true;
+            }
+            current = parent.parent_link_id.as_deref();
+        }
+        false
+    }
+
     /// Check if `descendant` is a child/grandchild/... of `ancestor`.
     pub fn is_descendant(&self, ancestor: &str, descendant: &str) -> bool {
         let mut current = descendant;
