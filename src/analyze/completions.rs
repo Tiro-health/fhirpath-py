@@ -21,6 +21,10 @@ pub struct CompletionItem {
     pub kind: CompletionItemKind,
     pub link_id: String,
     pub item_type: String,
+    /// `true` if any item on the path from the Questionnaire root down to and
+    /// including the target item has `repeats: true`. UI hosts can use this to
+    /// warn that the chain may collapse multiple instances into a single list.
+    pub traverses_repeating: bool,
 }
 
 // ── Context resolution ─────────────────────────────────────────────────
@@ -129,6 +133,7 @@ fn emit_value_completions(
     item_type: &str,
     value_prefix: &str,
     detail: Option<String>,
+    traverses_repeating: bool,
     counter: &mut usize,
     out: &mut Vec<CompletionItem>,
 ) {
@@ -147,6 +152,7 @@ fn emit_value_completions(
         kind: CompletionItemKind::Value,
         link_id: link_id.to_string(),
         item_type: item_type.to_string(),
+        traverses_repeating,
     });
     *counter += 1;
 
@@ -160,6 +166,7 @@ fn emit_value_completions(
             kind: CompletionItemKind::Code,
             link_id: link_id.to_string(),
             item_type: item_type.to_string(),
+            traverses_repeating,
         });
         *counter += 1;
 
@@ -172,9 +179,18 @@ fn emit_value_completions(
             kind: CompletionItemKind::Display,
             link_id: link_id.to_string(),
             item_type: item_type.to_string(),
+            traverses_repeating,
         });
         *counter += 1;
     }
+}
+
+fn chain_traverses_repeating(index: &QuestionnaireIndex, link_id: &str) -> bool {
+    index
+        .get(link_id)
+        .map(|i| i.repeats)
+        .unwrap_or(false)
+        || index.has_repeating_ancestor(link_id)
 }
 
 fn emit_subtree(
@@ -207,6 +223,7 @@ fn emit_subtree(
             &info.item_type,
             &value_prefix,
             detail,
+            chain_traverses_repeating(index, link_id),
             counter,
             out,
         );
@@ -265,6 +282,7 @@ pub fn generate_completions(
                     &info.item_type,
                     "answer.value",
                     None,
+                    chain_traverses_repeating(index, link_id),
                     &mut counter,
                     &mut out,
                 );
@@ -296,6 +314,7 @@ pub fn generate_completions(
                 &info.item_type,
                 "value",
                 None,
+                chain_traverses_repeating(index, link_id),
                 &mut counter,
                 &mut out,
             );
@@ -648,6 +667,131 @@ mod tests {
             assert_eq!(v.link_id, "choice1");
             assert_eq!(v.item_type, "choice");
         }
+    }
+
+    #[test]
+    fn test_traverses_repeating_false_for_non_repeating_chain() {
+        let idx = QuestionnaireIndex::build(&questionnaire());
+        let items = generate_completions(&idx, "item.where(linkId='group1')").unwrap();
+
+        for item in &items {
+            assert!(
+                !item.traverses_repeating,
+                "expected traverses_repeating=false for {} (link_id={})",
+                item.insert_text,
+                item.link_id
+            );
+        }
+    }
+
+    #[test]
+    fn test_traverses_repeating_when_leaf_repeats() {
+        let q = json!({
+            "resourceType": "Questionnaire",
+            "item": [{
+                "linkId": "answers",
+                "text": "Multi-answer",
+                "type": "string",
+                "repeats": true
+            }]
+        });
+        let idx = QuestionnaireIndex::build(&q);
+        let items = generate_completions(&idx, "item.where(linkId='answers')").unwrap();
+
+        let value = items
+            .iter()
+            .find(|c| c.insert_text == "answer.value")
+            .unwrap();
+        assert!(value.traverses_repeating);
+    }
+
+    #[test]
+    fn test_traverses_repeating_when_ancestor_repeats() {
+        let q = json!({
+            "resourceType": "Questionnaire",
+            "item": [{
+                "linkId": "repeating-group",
+                "text": "Repeating Group",
+                "type": "group",
+                "repeats": true,
+                "item": [{
+                    "linkId": "leaf",
+                    "text": "Leaf",
+                    "type": "string"
+                }]
+            }]
+        });
+        let idx = QuestionnaireIndex::build(&q);
+        let items = generate_completions(&idx, "item.where(linkId='repeating-group')").unwrap();
+
+        let leaf = items
+            .iter()
+            .find(|c| c.insert_text == "item.where(linkId='leaf').answer.value")
+            .unwrap();
+        assert!(
+            leaf.traverses_repeating,
+            "leaf inside repeating group should be flagged"
+        );
+    }
+
+    #[test]
+    fn test_traverses_repeating_mixed_within_one_questionnaire() {
+        let q = json!({
+            "resourceType": "Questionnaire",
+            "item": [
+                {
+                    "linkId": "stable",
+                    "text": "Stable",
+                    "type": "string"
+                },
+                {
+                    "linkId": "rep",
+                    "text": "Rep",
+                    "type": "string",
+                    "repeats": true
+                }
+            ]
+        });
+        let idx = QuestionnaireIndex::build(&q);
+        let items = generate_completions(&idx, "%resource").unwrap();
+
+        let stable = items
+            .iter()
+            .find(|c| c.link_id == "stable")
+            .unwrap();
+        let rep = items.iter().find(|c| c.link_id == "rep").unwrap();
+        assert!(!stable.traverses_repeating);
+        assert!(rep.traverses_repeating);
+    }
+
+    #[test]
+    fn test_traverses_repeating_in_answer_context() {
+        let q = json!({
+            "resourceType": "Questionnaire",
+            "item": [{
+                "linkId": "parent",
+                "text": "Parent",
+                "type": "coding",
+                "repeats": true,
+                "item": [{
+                    "linkId": "child",
+                    "text": "Child",
+                    "type": "string"
+                }]
+            }]
+        });
+        let idx = QuestionnaireIndex::build(&q);
+        let items =
+            generate_completions(&idx, "item.where(linkId='parent').answer").unwrap();
+
+        let own = items.iter().find(|c| c.insert_text == "value").unwrap();
+        assert!(own.traverses_repeating);
+
+        let child = items
+            .iter()
+            .find(|c| c.insert_text == "item.where(linkId='child').answer.value")
+            .unwrap();
+        assert!(child.traverses_repeating);
     }
 
     #[test]
