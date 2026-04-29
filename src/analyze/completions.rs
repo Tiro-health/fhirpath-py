@@ -21,9 +21,12 @@ pub struct CompletionItem {
     pub kind: CompletionItemKind,
     pub link_id: String,
     pub item_type: String,
-    /// `true` if any item on the path from the Questionnaire root down to and
-    /// including the target item has `repeats: true`. UI hosts can use this to
-    /// warn that the chain may collapse multiple instances into a single list.
+    /// `true` if accepting this suggestion crosses a repeating boundary that
+    /// the user's typed prefix has not already crossed — i.e. any item
+    /// strictly between the context anchor and the target leaf (or the leaf
+    /// itself) has `repeats: true`. Items already in the prefix, including
+    /// the anchor itself, are excluded. UI hosts can use this to warn that
+    /// the chain may collapse multiple instances into a single list.
     pub traverses_repeating: bool,
 }
 
@@ -185,12 +188,25 @@ fn emit_value_completions(
     }
 }
 
-fn chain_traverses_repeating(index: &QuestionnaireIndex, link_id: &str) -> bool {
-    index
-        .get(link_id)
-        .map(|i| i.repeats)
-        .unwrap_or(false)
-        || index.has_repeating_ancestor(link_id)
+/// `anchor` is the deepest linkId resolved from `context_expr` (the user's
+/// typed prefix). Items in the prefix — including the anchor itself — are
+/// excluded from the walk: only repeating boundaries introduced by the
+/// suggestion count. `None` (Root context) preserves the original
+/// full-ancestry behavior.
+fn chain_traverses_repeating(
+    index: &QuestionnaireIndex,
+    link_id: &str,
+    anchor: Option<&str>,
+) -> bool {
+    if anchor == Some(link_id) {
+        return false;
+    }
+    let leaf_repeats = index.get(link_id).map(|i| i.repeats).unwrap_or(false);
+    let ancestor_repeats = match anchor {
+        Some(a) => index.has_repeating_ancestor_until(link_id, a),
+        None => index.has_repeating_ancestor(link_id),
+    };
+    leaf_repeats || ancestor_repeats
 }
 
 fn emit_subtree(
@@ -198,6 +214,7 @@ fn emit_subtree(
     link_id: &str,
     prefix: &str,
     breadcrumb_parts: &[&str],
+    anchor: Option<&str>,
     counter: &mut usize,
     out: &mut Vec<CompletionItem>,
 ) {
@@ -223,7 +240,7 @@ fn emit_subtree(
             &info.item_type,
             &value_prefix,
             detail,
-            chain_traverses_repeating(index, link_id),
+            chain_traverses_repeating(index, link_id, anchor),
             counter,
             out,
         );
@@ -240,7 +257,15 @@ fn emit_subtree(
 
     for child_id in &info.children {
         let child_prefix = format!("{child_nav_prefix}.where(linkId='{child_id}')");
-        emit_subtree(index, child_id, &child_prefix, &child_breadcrumbs, counter, out);
+        emit_subtree(
+            index,
+            child_id,
+            &child_prefix,
+            &child_breadcrumbs,
+            anchor,
+            counter,
+            out,
+        );
     }
 }
 
@@ -262,7 +287,7 @@ pub fn generate_completions(
         ContextPosition::Root => {
             for child_id in index.roots() {
                 let prefix = format!("item.where(linkId='{child_id}')");
-                emit_subtree(index, child_id, &prefix, &[], &mut counter, &mut out);
+                emit_subtree(index, child_id, &prefix, &[], None, &mut counter, &mut out);
             }
         }
         ContextPosition::ItemFiltered(ref link_id) => {
@@ -270,10 +295,20 @@ pub fn generate_completions(
                 return Ok(Vec::new());
             };
 
+            let anchor = Some(link_id.as_str());
+
             if info.item_type == "group" {
                 for child_id in &info.children {
                     let prefix = format!("item.where(linkId='{child_id}')");
-                    emit_subtree(index, child_id, &prefix, &[], &mut counter, &mut out);
+                    emit_subtree(
+                        index,
+                        child_id,
+                        &prefix,
+                        &[],
+                        anchor,
+                        &mut counter,
+                        &mut out,
+                    );
                 }
             } else {
                 emit_value_completions(
@@ -282,7 +317,7 @@ pub fn generate_completions(
                     &info.item_type,
                     "answer.value",
                     None,
-                    chain_traverses_repeating(index, link_id),
+                    chain_traverses_repeating(index, link_id, anchor),
                     &mut counter,
                     &mut out,
                 );
@@ -295,6 +330,7 @@ pub fn generate_completions(
                         child_id,
                         &prefix,
                         &breadcrumbs,
+                        anchor,
                         &mut counter,
                         &mut out,
                     );
@@ -308,13 +344,15 @@ pub fn generate_completions(
                 return Ok(Vec::new());
             };
 
+            let anchor = Some(link_id.as_str());
+
             emit_value_completions(
                 &info.text,
                 link_id,
                 &info.item_type,
                 "value",
                 None,
-                chain_traverses_repeating(index, link_id),
+                chain_traverses_repeating(index, link_id, anchor),
                 &mut counter,
                 &mut out,
             );
@@ -327,6 +365,7 @@ pub fn generate_completions(
                     child_id,
                     &prefix,
                     &breadcrumbs,
+                    anchor,
                     &mut counter,
                     &mut out,
                 );
@@ -685,7 +724,10 @@ mod tests {
     }
 
     #[test]
-    fn test_traverses_repeating_when_leaf_repeats() {
+    fn test_traverses_repeating_false_for_own_value_at_repeating_anchor() {
+        // Anchor is the repeating item itself: typing
+        // `item.where(linkId='answers')` already commits to its multiplicity,
+        // so suggesting its own value adds no new repeating boundary.
         let q = json!({
             "resourceType": "Questionnaire",
             "item": [{
@@ -702,11 +744,85 @@ mod tests {
             .iter()
             .find(|c| c.insert_text == "answer.value")
             .unwrap();
-        assert!(value.traverses_repeating);
+        assert!(!value.traverses_repeating);
     }
 
     #[test]
-    fn test_traverses_repeating_when_ancestor_repeats() {
+    fn test_traverses_repeating_true_for_repeating_leaf_below_anchor() {
+        // Anchor `parent` does not repeat; suggestion descends into a
+        // repeating child. The boundary IS introduced by the suggestion.
+        let q = json!({
+            "resourceType": "Questionnaire",
+            "item": [{
+                "linkId": "parent",
+                "text": "Parent",
+                "type": "group",
+                "item": [{
+                    "linkId": "rep_child",
+                    "text": "Rep Child",
+                    "type": "string",
+                    "repeats": true
+                }]
+            }]
+        });
+        let idx = QuestionnaireIndex::build(&q);
+        let items = generate_completions(&idx, "item.where(linkId='parent')").unwrap();
+
+        let leaf = items
+            .iter()
+            .find(|c| c.insert_text == "item.where(linkId='rep_child').answer.value")
+            .unwrap();
+        assert!(
+            leaf.traverses_repeating,
+            "repeating leaf below a non-repeating anchor should be flagged"
+        );
+    }
+
+    #[test]
+    fn test_traverses_repeating_true_for_repeating_intermediate_below_anchor() {
+        // Anchor is the outer non-repeating group; the path from anchor down
+        // to the leaf crosses a repeating intermediate group. That's a
+        // boundary the suggestion introduces.
+        let q = json!({
+            "resourceType": "Questionnaire",
+            "item": [{
+                "linkId": "outer",
+                "text": "Outer",
+                "type": "group",
+                "item": [{
+                    "linkId": "rep_group",
+                    "text": "Rep Group",
+                    "type": "group",
+                    "repeats": true,
+                    "item": [{
+                        "linkId": "leaf",
+                        "text": "Leaf",
+                        "type": "string"
+                    }]
+                }]
+            }]
+        });
+        let idx = QuestionnaireIndex::build(&q);
+        let items = generate_completions(&idx, "item.where(linkId='outer')").unwrap();
+
+        let leaf = items
+            .iter()
+            .find(|c| {
+                c.insert_text
+                    == "item.where(linkId='rep_group').item.where(linkId='leaf').answer.value"
+            })
+            .unwrap();
+        assert!(
+            leaf.traverses_repeating,
+            "leaf below a repeating intermediate (between anchor and leaf) should be flagged"
+        );
+    }
+
+    #[test]
+    fn test_traverses_repeating_anchor_itself_excluded() {
+        // The repeating boundary on `repeating-group` is in the prefix the
+        // user already typed; descending into a non-repeating child adds no
+        // new boundary.
         let q = json!({
             "resourceType": "Questionnaire",
             "item": [{
@@ -729,8 +845,8 @@ mod tests {
             .find(|c| c.insert_text == "item.where(linkId='leaf').answer.value")
             .unwrap();
         assert!(
-            leaf.traverses_repeating,
-            "leaf inside repeating group should be flagged"
+            !leaf.traverses_repeating,
+            "anchor's own repeats was committed by the prefix; child should not be flagged"
         );
     }
 
@@ -765,7 +881,9 @@ mod tests {
     }
 
     #[test]
-    fn test_traverses_repeating_in_answer_context() {
+    fn test_traverses_repeating_anchor_excluded_in_answer_context() {
+        // `parent` repeats, but it's already in the typed prefix. Neither the
+        // own value nor the descendant introduces a new repeating boundary.
         let q = json!({
             "resourceType": "Questionnaire",
             "item": [{
@@ -785,13 +903,13 @@ mod tests {
             generate_completions(&idx, "item.where(linkId='parent').answer").unwrap();
 
         let own = items.iter().find(|c| c.insert_text == "value").unwrap();
-        assert!(own.traverses_repeating);
+        assert!(!own.traverses_repeating);
 
         let child = items
             .iter()
             .find(|c| c.insert_text == "item.where(linkId='child').answer.value")
             .unwrap();
-        assert!(child.traverses_repeating);
+        assert!(!child.traverses_repeating);
     }
 
     #[test]
