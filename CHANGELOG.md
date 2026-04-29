@@ -1,3 +1,34 @@
+## 3.0.0
+
+### Breaking
+
+- Replace ANTLR4 parser with a Rust FHIRPath parser (PyO3 bindings)
+- Rename Cargo crate from `fhirpathrs` to `fhirpath-rs`
+- Drop ANTLR4 backend and legacy tooling
+- Require Python >= 3.10
+
+### Added
+
+- `CompletionItem` now exposes `link_id` and `item_type` fields (#51)
+- WASM target: `@tiro-health/fhirpath-wasm` via wasm-bindgen (#13)
+- Analysis API via PyO3: `annotate_expression()`, `analyze_expression()`, `QuestionnaireIndex` (#12)
+- SDC expression analysis with annotation extraction (#7)
+- `QuestionnaireIndex` for questionnaire-aware validation (#8)
+- LinkId validation for SDC expressions (#9)
+- Value type validation for SDC expressions (#10)
+- Context expression validation (#11)
+- Byte offsets on `Token` and `AstNode` (#5)
+- Feature-flagged build: `python` (default) and `wasm` features (#6)
+- `register_as_fhirpathpy()` for drop-in replacement of fhirpathpy
+- Automated PyPI publishing via OIDC trusted publishing
+- Automated npm publishing for WASM package
+
+### Fixed
+
+- Fix missing Answer to Item state transition in annotation state machine
+- Add R5 `coding` item type to value type mapping
+- Use `(system, code)` tuple as answer option key
+
 ## 2.1.0
 
 - Fix bug with $this evaluation context in function invocations #60 @brianpos
