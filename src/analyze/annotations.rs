@@ -991,9 +991,9 @@ pub(crate) fn annotate_expression_with_diagnostics(
 pub(crate) fn annotate_expression_with_ast(
     expr: &str,
 ) -> Result<(AstNode, Vec<Annotation>, Vec<Diagnostic>), crate::ParseError> {
-    let tokens = crate::lexer::tokenize(expr).map_err(crate::ParseError)?;
+    let tokens = crate::lexer::tokenize(expr)?;
     let mut p = crate::parser::Parser::new(&tokens);
-    let root = p.parse_entire_expression().map_err(crate::ParseError)?;
+    let root = p.parse_entire_expression()?;
 
     let mut answer_refs = Vec::new();
     let mut diagnostics = Vec::new();

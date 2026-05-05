@@ -1,5 +1,7 @@
 /// FHIRPath lexer: &str → Vec<Token>
 
+use crate::ParseError;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TokenKind {
     // Literals
@@ -69,7 +71,7 @@ pub struct Token {
     pub byte_end: usize,
 }
 
-pub fn tokenize(input: &str) -> Result<Vec<Token>, String> {
+pub fn tokenize(input: &str) -> Result<Vec<Token>, ParseError> {
     let mut tokens = Vec::new();
     let chars: Vec<char> = input.chars().collect();
     // Build a mapping from char index → byte offset in the original string.
@@ -97,10 +99,13 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, String> {
                 continue;
             } else if i + 1 < len && chars[i + 1] == '*' {
                 // Block comment
+                let start_byte = char_to_byte[i];
                 i += 2;
                 loop {
                     if i + 1 >= len {
-                        return Err("Unterminated block comment".into());
+                        return Err(ParseError::UnterminatedBlockComment {
+                            byte_pos: start_byte,
+                        });
                     }
                     if chars[i] == '*' && chars[i + 1] == '/' {
                         i += 2;
@@ -127,7 +132,10 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, String> {
                 i += 2;
                 continue;
             }
-            return Err(format!("Unexpected character '!' at position {i}"));
+            return Err(ParseError::UnexpectedChar {
+                ch: '!',
+                byte_pos: char_to_byte[i],
+            });
         }
         if c == '<' && i + 1 < len && chars[i + 1] == '=' {
             tokens.push(Token { kind: TokenKind::LtEq, text: "<=".into(), byte_start: char_to_byte[i], byte_end: char_to_byte[i + 1] + 1 });
@@ -191,7 +199,9 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, String> {
                 i += 6;
                 continue;
             }
-            return Err(format!("Unknown $ variable at position {i}"));
+            return Err(ParseError::UnknownDollarVariable {
+                byte_pos: char_to_byte[i],
+            });
         }
 
         // 6. DateTime/Time literals (starts with @)
@@ -231,7 +241,7 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, String> {
         // 7. String literals (starts with ')
         if c == '\'' {
             let byte_start = char_to_byte[i];
-            let text = scan_quoted(&chars, &mut i, '\'')?;
+            let text = scan_quoted(&chars, &mut i, '\'', &char_to_byte)?;
             let byte_end = if i < len { char_to_byte[i] } else { input.len() };
             tokens.push(Token { kind: TokenKind::String, text, byte_start, byte_end });
             continue;
@@ -240,7 +250,7 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, String> {
         // 8. Delimited identifiers (starts with `)
         if c == '`' {
             let byte_start = char_to_byte[i];
-            let text = scan_quoted(&chars, &mut i, '`')?;
+            let text = scan_quoted(&chars, &mut i, '`', &char_to_byte)?;
             let byte_end = if i < len { char_to_byte[i] } else { input.len() };
             tokens.push(Token { kind: TokenKind::DelimitedIdentifier, text, byte_start, byte_end });
             continue;
@@ -294,7 +304,10 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, String> {
             continue;
         }
 
-        return Err(format!("Unexpected character {c:?} at position {i}"));
+        return Err(ParseError::UnexpectedChar {
+            ch: c,
+            byte_pos: char_to_byte[i],
+        });
     }
 
     tokens.push(Token { kind: TokenKind::Eof, text: String::new(), byte_start: input.len(), byte_end: input.len() });
@@ -360,7 +373,12 @@ fn scan_timeformat(chars: &[char], mut i: usize) -> usize {
 /// Scan a quoted string (single-quote or backtick). Handles escapes.
 /// Returns the raw token text including the surrounding quote characters.
 /// Advances `i` past the closing quote.
-fn scan_quoted(chars: &[char], i: &mut usize, quote: char) -> Result<String, String> {
+fn scan_quoted(
+    chars: &[char],
+    i: &mut usize,
+    quote: char,
+    char_to_byte: &[usize],
+) -> Result<String, ParseError> {
     let start = *i;
     *i += 1; // skip opening quote
     let len = chars.len();
@@ -376,5 +394,8 @@ fn scan_quoted(chars: &[char], i: &mut usize, quote: char) -> Result<String, Str
         }
         *i += 1;
     }
-    Err(format!("Unterminated {quote} literal starting at position {start}"))
+    Err(ParseError::UnterminatedQuoted {
+        quote,
+        byte_pos: char_to_byte[start],
+    })
 }

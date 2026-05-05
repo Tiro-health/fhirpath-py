@@ -14,7 +14,7 @@ use crate::AstNode;
 #[pyfunction]
 fn parse(py: Python<'_>, expr: &str) -> PyResult<PyObject> {
     let (ast, tokens) = rust_parse_with_tokens(expr)
-        .map_err(|e| pyo3::exceptions::PySyntaxError::new_err(e.0))?;
+        .map_err(|e| pyo3::exceptions::PySyntaxError::new_err(e.to_string()))?;
 
     // Build root dict: { "children": [top_expression] }
     let root = PyDict::new(py);
@@ -115,7 +115,7 @@ impl PyQuestionnaireIndex {
 
     fn generate_completions(&self, py: Python<'_>, context_expr: &str) -> PyResult<PyObject> {
         let items = analyze::generate_completions(&self.inner, context_expr)
-            .map_err(|e| pyo3::exceptions::PySyntaxError::new_err(e.0))?;
+            .map_err(|e| pyo3::exceptions::PySyntaxError::new_err(e.to_string()))?;
         let result: Vec<PyObject> = items
             .iter()
             .map(|item| completion_item_to_pydict(py, item))
@@ -246,7 +246,7 @@ fn diagnostic_to_pydict(py: Python<'_>, diag: &analyze::Diagnostic) -> PyResult<
 #[pyfunction]
 fn annotate_expression(py: Python<'_>, expr: &str) -> PyResult<PyObject> {
     let annotations = analyze::annotate_expression(expr)
-        .map_err(|e| pyo3::exceptions::PySyntaxError::new_err(e.0))?;
+        .map_err(|e| pyo3::exceptions::PySyntaxError::new_err(e.to_string()))?;
     let result: Vec<PyObject> = annotations
         .iter()
         .map(|a| annotation_to_pydict(py, a))
@@ -263,7 +263,7 @@ fn annotate_expression(py: Python<'_>, expr: &str) -> PyResult<PyObject> {
 #[pyfunction]
 fn resolve_context(expr: &str, base_expr: &str) -> PyResult<String> {
     crate::resolve::resolve_context(expr, base_expr)
-        .map_err(|e| pyo3::exceptions::PySyntaxError::new_err(e.0))
+        .map_err(|e| pyo3::exceptions::PySyntaxError::new_err(e.to_string()))
 }
 
 fn inferred_type_to_str(t: &InferredType) -> &'static str {
@@ -354,7 +354,7 @@ fn analyze_expression(
         expected_cardinality: expected_card,
     };
     let result = analyze::analyze_expression(expr, &index.inner, &context)
-        .map_err(|e| pyo3::exceptions::PySyntaxError::new_err(e.0))?;
+        .map_err(|e| pyo3::exceptions::PySyntaxError::new_err(e.to_string()))?;
 
     let annotations: Vec<PyObject> = result
         .annotations
@@ -391,8 +391,8 @@ pub fn _rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
 
 /// Internal helper: parse and also return the token stream (needed for text computation).
 fn rust_parse_with_tokens(expr: &str) -> Result<(AstNode, Vec<Token>), crate::ParseError> {
-    let tokens = crate::lexer::tokenize(expr).map_err(crate::ParseError)?;
+    let tokens = crate::lexer::tokenize(expr)?;
     let mut p = crate::parser::Parser::new(&tokens);
-    let ast = p.parse_entire_expression().map_err(crate::ParseError)?;
+    let ast = p.parse_entire_expression()?;
     Ok((ast, tokens))
 }

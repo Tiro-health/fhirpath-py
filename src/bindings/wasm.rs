@@ -29,7 +29,7 @@ fn convert_diagnostic_spans(diagnostics: &mut [analyze::Diagnostic], expr: &str)
 /// Returns the AST as a JavaScript object.
 #[wasm_bindgen]
 pub fn parse(expr: &str) -> Result<JsValue, JsError> {
-    let ast = crate::parse(expr).map_err(|e| JsError::new(&e.0))?;
+    let ast = crate::parse(expr).map_err(|e| JsError::new(&e.to_string()))?;
     serde_wasm_bindgen::to_value(&ast).map_err(|e| JsError::new(&e.to_string()))
 }
 
@@ -83,7 +83,7 @@ impl QuestionnaireIndex {
 /// Returns `expr` unchanged when no `%context` reference exists.
 #[wasm_bindgen]
 pub fn resolve_context(expr: &str, base_expr: &str) -> Result<String, JsError> {
-    crate::resolve::resolve_context(expr, base_expr).map_err(|e| JsError::new(&e.0))
+    crate::resolve::resolve_context(expr, base_expr).map_err(|e| JsError::new(&e.to_string()))
 }
 
 fn parse_inferred_type(s: &str) -> Option<analyze::InferredType> {

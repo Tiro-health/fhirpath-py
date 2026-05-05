@@ -52,9 +52,9 @@ pub(crate) fn validate_link_ids_from_expr(
     index: &QuestionnaireIndex,
     scope_link_id: Option<&str>,
 ) -> Result<Vec<Diagnostic>, crate::ParseError> {
-    let tokens = crate::lexer::tokenize(expr).map_err(crate::ParseError)?;
+    let tokens = crate::lexer::tokenize(expr)?;
     let mut parser = crate::parser::Parser::new(&tokens);
-    let root = parser.parse_entire_expression().map_err(crate::ParseError)?;
+    let root = parser.parse_entire_expression()?;
 
     Ok(validate_link_ids_from_ast(&root, index, scope_link_id))
 }
