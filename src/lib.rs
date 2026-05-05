@@ -1,5 +1,6 @@
 pub mod analyze;
 pub mod bindings;
+pub mod compat;
 pub mod lexer;
 pub mod parser;
 pub mod resolve;
