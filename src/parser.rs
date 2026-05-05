@@ -39,8 +39,8 @@ impl<'a> Parser<'a> {
         Parser { tokens, pos: 0 }
     }
 
-    fn peek(&self) -> &TokenKind {
-        &self.tokens[self.pos].kind
+    fn peek(&self) -> TokenKind {
+        self.tokens[self.pos].kind
     }
 
     fn current(&self) -> &Token {
@@ -53,7 +53,7 @@ impl<'a> Parser<'a> {
         tok
     }
 
-    fn expect(&mut self, kind: &TokenKind) -> Result<&Token, String> {
+    fn expect(&mut self, kind: TokenKind) -> Result<&Token, String> {
         if self.peek() == kind {
             Ok(self.advance())
         } else {
@@ -75,7 +75,7 @@ impl<'a> Parser<'a> {
 
     pub fn parse_entire_expression(&mut self) -> Result<AstNode, String> {
         let expr = self.parse_expression()?;
-        if *self.peek() != TokenKind::Eof {
+        if self.peek() != TokenKind::Eof {
             return Err(format!(
                 "Unexpected token after expression: {:?} ({:?})",
                 self.peek(),
@@ -122,7 +122,7 @@ impl<'a> Parser<'a> {
     fn parse_type(&mut self) -> Result<AstNode, String> {
         let start = self.pos;
         let mut left = self.parse_inequality()?;
-        while *self.peek() == TokenKind::Is || *self.peek() == TokenKind::As {
+        while self.peek() == TokenKind::Is || self.peek() == TokenKind::As {
             let op_tok = self.advance().clone();
             let type_spec = self.parse_type_specifier()?;
             let mut node = AstNode::new("TypeExpression", start, self.tokens);
@@ -164,7 +164,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_unary(&mut self) -> Result<AstNode, String> {
-        if *self.peek() == TokenKind::Plus || *self.peek() == TokenKind::Minus {
+        if self.peek() == TokenKind::Plus || self.peek() == TokenKind::Minus {
             let start = self.pos;
             let op_tok = self.advance().clone();
             let operand = self.parse_unary()?;
@@ -182,7 +182,7 @@ impl<'a> Parser<'a> {
         let start = self.pos;
         let mut left = self.parse_term()?;
         loop {
-            if *self.peek() == TokenKind::Dot {
+            if self.peek() == TokenKind::Dot {
                 let dot = self.advance().clone();
                 let inv = self.parse_invocation()?;
                 let mut node = AstNode::new("InvocationExpression", start, self.tokens);
@@ -191,10 +191,10 @@ impl<'a> Parser<'a> {
                 node.children.push(inv);
                 self.set_end(&mut node);
                 left = node;
-            } else if *self.peek() == TokenKind::LBracket {
+            } else if self.peek() == TokenKind::LBracket {
                 let lb = self.advance().clone();
                 let index_expr = self.parse_expression()?;
-                let rb = self.expect(&TokenKind::RBracket)?.clone();
+                let rb = self.expect(TokenKind::RBracket)?.clone();
                 let mut node = AstNode::new("IndexerExpression", start, self.tokens);
                 node.terminal_node_text.push(lb.text.clone());
                 node.terminal_node_text.push(rb.text.clone());
@@ -219,7 +219,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_term_inner(&mut self) -> Result<AstNode, String> {
-        match self.peek().clone() {
+        match self.peek() {
             TokenKind::LParen => self.parse_parenthesized_term(),
             // ANTLR error recovery treats [expr] like (expr) in term position.
             // We replicate this so expressions like `intersect([list])` work.
@@ -254,7 +254,7 @@ impl<'a> Parser<'a> {
         let start = self.pos;
         let lp = self.advance().clone();
         let expr = self.parse_expression()?;
-        let rp = self.expect(&TokenKind::RParen)?.clone();
+        let rp = self.expect(TokenKind::RParen)?.clone();
         let mut node = AstNode::new("ParenthesizedTerm", start, self.tokens);
         node.terminal_node_text.push(lp.text.clone());
         node.terminal_node_text.push(rp.text.clone());
@@ -269,7 +269,7 @@ impl<'a> Parser<'a> {
     fn parse_bracket_term(&mut self) -> Result<AstNode, String> {
         self.advance(); // skip '['
         let inner = self.parse_term_inner()?;
-        if *self.peek() == TokenKind::RBracket {
+        if self.peek() == TokenKind::RBracket {
             self.advance(); // skip ']'
         }
         Ok(inner)
@@ -278,7 +278,7 @@ impl<'a> Parser<'a> {
     fn parse_null_literal_term(&mut self) -> Result<AstNode, String> {
         let start = self.pos;
         let lb = self.advance().clone();
-        let rb = self.expect(&TokenKind::RBrace)?.clone();
+        let rb = self.expect(TokenKind::RBrace)?.clone();
         let mut literal = AstNode::new("NullLiteral", start, self.tokens);
         literal.terminal_node_text.push(lb.text.clone());
         literal.terminal_node_text.push(rb.text.clone());
@@ -412,7 +412,7 @@ impl<'a> Parser<'a> {
     // ── Invocation ──────────────────────────────────────────────────────
 
     fn parse_invocation(&mut self) -> Result<AstNode, String> {
-        match self.peek().clone() {
+        match self.peek() {
             TokenKind::DollarThis => {
                 let start = self.pos;
                 let tok = self.advance().clone();
@@ -446,7 +446,7 @@ impl<'a> Parser<'a> {
                 // Lookahead: identifier followed by '(' → function invocation
                 let start = self.pos;
                 let ident = self.parse_identifier()?;
-                if *self.peek() == TokenKind::LParen {
+                if self.peek() == TokenKind::LParen {
                     self.parse_function_invocation(start, ident)
                 } else {
                     let mut node = AstNode::new("MemberInvocation", start, self.tokens);
@@ -472,11 +472,11 @@ impl<'a> Parser<'a> {
         let mut functn = AstNode::new("Functn", start, self.tokens);
         functn.terminal_node_text.push(lp.text.clone());
         functn.children.push(ident);
-        if *self.peek() != TokenKind::RParen {
+        if self.peek() != TokenKind::RParen {
             let params = self.parse_param_list()?;
             functn.children.push(params);
         }
-        let rp = self.expect(&TokenKind::RParen)?.clone();
+        let rp = self.expect(TokenKind::RParen)?.clone();
         functn.terminal_node_text.push(rp.text.clone());
         self.set_end(&mut functn);
         let mut fi = AstNode::new("FunctionInvocation", start, self.tokens);
@@ -490,7 +490,7 @@ impl<'a> Parser<'a> {
         let mut pl = AstNode::new("ParamList", start, self.tokens);
         let first = self.parse_expression()?;
         pl.children.push(first);
-        while *self.peek() == TokenKind::Comma {
+        while self.peek() == TokenKind::Comma {
             let comma = self.advance().clone();
             pl.terminal_node_text.push(comma.text.clone());
             let next = self.parse_expression()?;
@@ -541,7 +541,7 @@ impl<'a> Parser<'a> {
         let mut qi = AstNode::new("QualifiedIdentifier", start, self.tokens);
         let first = self.parse_identifier()?;
         qi.children.push(first);
-        while *self.peek() == TokenKind::Dot {
+        while self.peek() == TokenKind::Dot {
             let dot = self.advance().clone();
             qi.terminal_node_text.push(dot.text.clone());
             let next = self.parse_identifier()?;
@@ -561,7 +561,7 @@ impl<'a> Parser<'a> {
     ) -> Result<AstNode, String> {
         let start = self.pos;
         let mut left = next(self)?;
-        while ops.contains(self.peek()) {
+        while ops.contains(&self.peek()) {
             let op_tok = self.advance().clone();
             let right = next(self)?;
             let mut node = AstNode::new(node_type, start, self.tokens);
