@@ -225,11 +225,11 @@ impl<'a> Parser<'a> {
             // We replicate this so expressions like `intersect([list])` work.
             TokenKind::LBracket => self.parse_bracket_term(),
             TokenKind::LBrace => self.parse_null_literal_term(),
-            TokenKind::True | TokenKind::False => self.parse_boolean_literal_term(),
-            TokenKind::String => self.parse_string_literal_term(),
+            TokenKind::True | TokenKind::False => self.parse_simple_literal_term("BooleanLiteral"),
+            TokenKind::String => self.parse_simple_literal_term("StringLiteral"),
             TokenKind::Number => self.parse_number_or_quantity_literal_term(),
-            TokenKind::DateTime => self.parse_datetime_literal_term(),
-            TokenKind::Time => self.parse_time_literal_term(),
+            TokenKind::DateTime => self.parse_simple_literal_term("DateTimeLiteral"),
+            TokenKind::Time => self.parse_simple_literal_term("TimeLiteral"),
             TokenKind::Percent => self.parse_external_constant_term(),
             TokenKind::Identifier
             | TokenKind::DelimitedIdentifier
@@ -289,22 +289,13 @@ impl<'a> Parser<'a> {
         Ok(term)
     }
 
-    fn parse_boolean_literal_term(&mut self) -> Result<AstNode, String> {
+    fn parse_simple_literal_term(
+        &mut self,
+        literal_kind: &'static str,
+    ) -> Result<AstNode, String> {
         let start = self.pos;
         let tok = self.advance().clone();
-        let mut literal = AstNode::new("BooleanLiteral", start, self.tokens);
-        literal.terminal_node_text.push(tok.text.clone());
-        self.set_end(&mut literal);
-        let mut term = AstNode::new("LiteralTerm", start, self.tokens);
-        term.children.push(literal);
-        self.set_end(&mut term);
-        Ok(term)
-    }
-
-    fn parse_string_literal_term(&mut self) -> Result<AstNode, String> {
-        let start = self.pos;
-        let tok = self.advance().clone();
-        let mut literal = AstNode::new("StringLiteral", start, self.tokens);
+        let mut literal = AstNode::new(literal_kind, start, self.tokens);
         literal.terminal_node_text.push(tok.text.clone());
         self.set_end(&mut literal);
         let mut term = AstNode::new("LiteralTerm", start, self.tokens);
@@ -383,30 +374,6 @@ impl<'a> Parser<'a> {
         }
         self.set_end(&mut unit);
         Ok(unit)
-    }
-
-    fn parse_datetime_literal_term(&mut self) -> Result<AstNode, String> {
-        let start = self.pos;
-        let tok = self.advance().clone();
-        let mut literal = AstNode::new("DateTimeLiteral", start, self.tokens);
-        literal.terminal_node_text.push(tok.text.clone());
-        self.set_end(&mut literal);
-        let mut term = AstNode::new("LiteralTerm", start, self.tokens);
-        term.children.push(literal);
-        self.set_end(&mut term);
-        Ok(term)
-    }
-
-    fn parse_time_literal_term(&mut self) -> Result<AstNode, String> {
-        let start = self.pos;
-        let tok = self.advance().clone();
-        let mut literal = AstNode::new("TimeLiteral", start, self.tokens);
-        literal.terminal_node_text.push(tok.text.clone());
-        self.set_end(&mut literal);
-        let mut term = AstNode::new("LiteralTerm", start, self.tokens);
-        term.children.push(literal);
-        self.set_end(&mut term);
-        Ok(term)
     }
 
     fn parse_external_constant_term(&mut self) -> Result<AstNode, String> {
