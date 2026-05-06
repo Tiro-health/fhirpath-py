@@ -328,10 +328,11 @@ pub fn analyze_expression(
 
     if let Some(expected) = context.expected_result_type {
         if inferred_type != InferredType::Unknown && inferred_type != expected {
+            let s = ast.span();
             diagnostics.push(Diagnostic {
                 span: Span {
-                    start: ast.byte_start,
-                    end: ast.byte_end,
+                    start: s.byte_start,
+                    end: s.byte_end,
                 },
                 severity: Severity::Error,
                 code: DiagnosticCode::ExpressionTypeMismatch,
@@ -346,10 +347,11 @@ pub fn analyze_expression(
 
     if let Some(expected) = context.expected_cardinality {
         if inferred_cardinality != Cardinality::Unknown && inferred_cardinality != expected {
+            let s = ast.span();
             diagnostics.push(Diagnostic {
                 span: Span {
-                    start: ast.byte_start,
-                    end: ast.byte_end,
+                    start: s.byte_start,
+                    end: s.byte_end,
                 },
                 severity: Severity::Error,
                 code: DiagnosticCode::ExpressionCardinalityMismatch,

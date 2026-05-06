@@ -201,7 +201,7 @@ fn lower_expr(expr: &Expr, tokens: &[Token]) -> AstNode {
             wrap(span, "TermExpression", par)
         }
         Expr::Literal(lit) => {
-            let span = literal_span(lit);
+            let span = lit.span();
             let lit_node = lower_literal(lit);
             let lit_term = wrap(span, "LiteralTerm", lit_node);
             wrap(span, "TermExpression", lit_term)
@@ -250,8 +250,8 @@ fn lower_invocation(inv: &Invocation, tokens: &[Token]) -> AstNode {
         Invocation::Function { name, args, span } => {
             let mut functn_children = vec![lower_identifier(name)];
             if !args.is_empty() {
-                let first_span = expr_span(&args[0]);
-                let last_span = expr_span(args.last().unwrap());
+                let first_span = args[0].span();
+                let last_span = args.last().unwrap().span();
                 let pl_tnt: Vec<String> =
                     (0..args.len().saturating_sub(1)).map(|_| ",".to_string()).collect();
                 let pl_children: Vec<AstNode> =
@@ -424,31 +424,6 @@ fn bin_op_node_type(op: BinOp) -> &'static str {
         BinOp::Union => "UnionExpression",
         BinOp::Plus | BinOp::Minus | BinOp::Concat => "AdditiveExpression",
         BinOp::Mul | BinOp::TrueDiv | BinOp::IntDiv | BinOp::Mod => "MultiplicativeExpression",
-    }
-}
-
-fn expr_span(expr: &Expr) -> &Span {
-    match expr {
-        Expr::Binary { span, .. }
-        | Expr::Polarity { span, .. }
-        | Expr::Type { span, .. }
-        | Expr::Indexer { span, .. }
-        | Expr::Invocation { span, .. }
-        | Expr::Parenthesized { span, .. }
-        | Expr::ExternalConstant { span, .. } => span,
-        Expr::Literal(lit) => literal_span(lit),
-    }
-}
-
-fn literal_span(lit: &Literal) -> &Span {
-    match lit {
-        Literal::Null { span }
-        | Literal::Boolean { span, .. }
-        | Literal::String { span, .. }
-        | Literal::Number { span, .. }
-        | Literal::Quantity { span, .. }
-        | Literal::DateTime { span, .. }
-        | Literal::Time { span, .. } => span,
     }
 }
 

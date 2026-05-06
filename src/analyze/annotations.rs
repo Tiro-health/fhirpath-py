@@ -4,7 +4,7 @@
 /// (e.g. `item.where(linkId='x').answer.value.code`).
 /// Pass 2 identifies coded values in equality/equivalence comparisons against those references.
 
-use crate::compat::AstNode;
+use crate::ast::{BinOp, Expr, ExternalConstantId, Invocation, Literal};
 
 use super::{Annotation, AnnotationKind, Attribution, Diagnostic, DiagnosticCode, Severity, Span, ValueAccessor};
 
@@ -50,207 +50,174 @@ pub(crate) struct ChainStep {
 
 // ── Helper functions ────────────────────────────────────────────────────
 
-/// If `node` is an Identifier, return its name.
-pub(crate) fn get_identifier_name(node: &AstNode) -> Option<&str> {
-    if node.node_type == "Identifier" {
-        node.terminal_node_text.first().map(|s| s.as_str())
+/// Extract the bare value of a string literal — strips the surrounding
+/// single quotes that `Literal::String::raw` keeps.
+fn extract_string_value(expr: &Expr) -> Option<String> {
+    let expr = unwrap_parens(expr);
+    match expr {
+        Expr::Literal(Literal::String { raw, .. }) if raw.len() >= 2 => {
+            Some(raw[1..raw.len() - 1].to_string())
+        }
+        _ => None,
+    }
+}
+
+/// Find a String literal Expr by descending into parens.
+fn find_string_literal(expr: &Expr) -> Option<&Expr> {
+    let inner = unwrap_parens(expr);
+    if matches!(inner, Expr::Literal(Literal::String { .. })) {
+        Some(inner)
     } else {
         None
     }
 }
 
-/// Navigate through TermExpression -> LiteralTerm -> StringLiteral to extract the string value.
-/// Strips the surrounding quote characters.
-fn extract_string_value(node: &AstNode) -> Option<String> {
-    let mut current = node;
-
-    // Walk through TermExpression -> LiteralTerm -> StringLiteral
-    if current.node_type == "TermExpression" {
-        current = current.children.first()?;
+/// Peel `Expr::Parenthesized` wrappers.
+fn unwrap_parens(mut expr: &Expr) -> &Expr {
+    while let Expr::Parenthesized { inner, .. } = expr {
+        expr = inner;
     }
-    if current.node_type == "LiteralTerm" {
-        current = current.children.first()?;
-    }
-    if current.node_type == "StringLiteral" {
-        let raw = current.terminal_node_text.first()?;
-        if raw.len() >= 2 {
-            return Some(raw[1..raw.len() - 1].to_string());
-        }
-    }
-    None
+    expr
 }
 
-/// Extract a linkId from a `where(linkId='...')` call.
-/// `functn` is the `Functn` node inside a `FunctionInvocation`.
-/// Returns the linkId string value and the byte span of the string literal.
-pub(crate) fn extract_link_id_from_where(functn: &AstNode) -> Option<(String, Span)> {
-    // Functn.children: [Identifier("where"), ParamList]
-    let name_node = functn.children.first()?;
-    if get_identifier_name(name_node)? != "where" {
+/// Convert an `Expr` span into the analyze-layer `Span`.
+fn span_of(expr: &Expr) -> Span {
+    let s = expr.span();
+    Span {
+        start: s.byte_start,
+        end: s.byte_end,
+    }
+}
+
+/// Walk `(receiver?).<member>` returning the member identifier name when the
+/// receiver is `$this` (or absent). Used to recognize either `linkId` or
+/// `$this.linkId` as the LHS of a where-predicate.
+fn extract_member_identifier_name(expr: &Expr) -> Option<&str> {
+    let expr = unwrap_parens(expr);
+    match expr {
+        // Bare member: `linkId`
+        Expr::Invocation {
+            receiver: None,
+            call: Invocation::Member { ident },
+            ..
+        } => Some(ident.raw.as_str()),
+        // `$this.linkId`
+        Expr::Invocation {
+            receiver: Some(rcv),
+            call: Invocation::Member { ident },
+            ..
+        } => match unwrap_parens(rcv) {
+            Expr::Invocation {
+                receiver: None,
+                call: Invocation::This { .. },
+                ..
+            } => Some(ident.raw.as_str()),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+/// Extract a linkId from a `where(linkId='...')` call. Returns the linkId
+/// value and the byte span of the string literal.
+pub(crate) fn extract_link_id_from_where(args: &[Expr]) -> Option<(String, Span)> {
+    let arg = unwrap_parens(args.first()?);
+    let Expr::Binary { op, lhs, rhs, .. } = arg else {
+        return None;
+    };
+    if !matches!(op, BinOp::Eq) {
         return None;
     }
-
-    let param_list = functn.children.get(1)?;
-    if param_list.node_type != "ParamList" {
-        return None;
-    }
-
-    let equality = param_list.children.first()?;
-    if equality.node_type != "EqualityExpression" {
-        return None;
-    }
-
-    // EqualityExpression.children: [left, right]
-    let left = equality.children.first()?;
-    let right = equality.children.get(1)?;
-
-    // left should be TermExpression -> InvocationTerm -> MemberInvocation -> Identifier("linkId")
-    let left_name = extract_member_identifier_name(left)?;
+    let left_name = extract_member_identifier_name(lhs)?;
     if left_name != "linkId" {
         return None;
     }
-
-    // Navigate to the StringLiteral node to get its byte span
-    let string_node = find_string_literal_node(right)?;
-    let value = extract_string_value(right)?;
-    Some((value, Span { start: string_node.byte_start, end: string_node.byte_end }))
+    let string_node = find_string_literal(rhs)?;
+    let value = extract_string_value(rhs)?;
+    Some((value, span_of(string_node)))
 }
 
-/// Navigate through TermExpression -> LiteralTerm -> StringLiteral to find the StringLiteral node.
-fn find_string_literal_node(node: &AstNode) -> Option<&AstNode> {
-    let mut current = node;
-    if current.node_type == "TermExpression" {
-        current = current.children.first()?;
-    }
-    if current.node_type == "LiteralTerm" {
-        current = current.children.first()?;
-    }
-    if current.node_type == "StringLiteral" {
-        Some(current)
-    } else {
-        None
-    }
-}
-
-/// Navigate TermExpression -> InvocationTerm -> MemberInvocation -> Identifier to get the name.
-///
-/// Also accepts `$this.<ident>` — an InvocationExpression whose receiver is
-/// `$this` and whose member names `<ident>`.
-fn extract_member_identifier_name(node: &AstNode) -> Option<&str> {
-    if node.node_type == "InvocationExpression" {
-        let receiver = node.children.first()?;
-        let member = node.children.get(1)?;
-        if !is_this_invocation(receiver) {
-            return None;
-        }
-        if member.node_type != "MemberInvocation" {
-            return None;
-        }
-        return get_identifier_name(member.children.first()?);
-    }
-
-    let mut current = node;
-    if current.node_type == "TermExpression" {
-        current = current.children.first()?;
-    }
-    if current.node_type == "InvocationTerm" {
-        current = current.children.first()?;
-    }
-    if current.node_type == "MemberInvocation" {
-        current = current.children.first()?;
-    }
-    get_identifier_name(current)
-}
-
-/// Returns true if `node` is a `TermExpression -> InvocationTerm -> ThisInvocation`.
-fn is_this_invocation(node: &AstNode) -> bool {
-    let mut current = node;
-    if current.node_type == "TermExpression" {
-        match current.children.first() {
-            Some(c) => current = c,
-            None => return false,
-        }
-    }
-    if current.node_type == "InvocationTerm" {
-        match current.children.first() {
-            Some(c) => current = c,
-            None => return false,
-        }
-    }
-    current.node_type == "ThisInvocation"
-}
-
-/// Recursively flatten an InvocationExpression tree into a chain of steps.
-pub(crate) fn decompose_chain(node: &AstNode) -> Option<Vec<ChainStep>> {
-    match node.node_type {
-        "TermExpression" => {
-            let inner = node.children.first()?;
-            match inner.node_type {
-                "InvocationTerm" => {
-                    let member = inner.children.first()?;
-                    match member.node_type {
-                        "MemberInvocation" => {
-                            let ident = member.children.first()?;
-                            let name = get_identifier_name(ident)?.to_string();
-                            Some(vec![ChainStep {
-                                kind: ChainStepKind::Identifier(name),
-                                link_id_span: None,
-                            }])
-                        }
-                        "ThisInvocation" => Some(vec![ChainStep {
-                            kind: ChainStepKind::ContextVar(ContextVarName::This),
-                            link_id_span: None,
-                        }]),
-                        "IndexInvocation" => Some(vec![ChainStep {
-                            kind: ChainStepKind::ContextVar(ContextVarName::Index),
-                            link_id_span: None,
-                        }]),
-                        "TotalInvocation" => Some(vec![ChainStep {
-                            kind: ChainStepKind::ContextVar(ContextVarName::Total),
-                            link_id_span: None,
-                        }]),
-                        _ => None,
+/// Recursively flatten an InvocationExpression / IndexerExpression tree into
+/// a chain of steps.
+pub(crate) fn decompose_chain(expr: &Expr) -> Option<Vec<ChainStep>> {
+    let expr = unwrap_parens(expr);
+    match expr {
+        Expr::Invocation {
+            receiver: None,
+            call,
+            ..
+        } => match call {
+            Invocation::Member { ident } => Some(vec![ChainStep {
+                kind: ChainStepKind::Identifier(ident.raw.clone()),
+                link_id_span: None,
+            }]),
+            Invocation::This { .. } => Some(vec![ChainStep {
+                kind: ChainStepKind::ContextVar(ContextVarName::This),
+                link_id_span: None,
+            }]),
+            Invocation::Index { .. } => Some(vec![ChainStep {
+                kind: ChainStepKind::ContextVar(ContextVarName::Index),
+                link_id_span: None,
+            }]),
+            Invocation::Total { .. } => Some(vec![ChainStep {
+                kind: ChainStepKind::ContextVar(ContextVarName::Total),
+                link_id_span: None,
+            }]),
+            Invocation::Function { name, args, .. } => {
+                let func_name = name.raw.clone();
+                let (link_id, link_id_span) = if func_name == "where" {
+                    match extract_link_id_from_where(args) {
+                        Some((id, span)) => (Some(id), Some(span)),
+                        None => (None, None),
                     }
-                }
-                "ExternalConstantTerm" => {
-                    let ext_const = inner.children.first()?;
-                    if ext_const.node_type != "ExternalConstant" {
-                        return None;
-                    }
-                    let ident = ext_const.children.first()?;
-                    let name = get_identifier_name(ident)?.to_string();
-                    Some(vec![ChainStep {
-                        kind: ChainStepKind::External(name),
-                        link_id_span: None,
-                    }])
-                }
-                _ => None,
+                } else {
+                    (None, None)
+                };
+                let integer_arg = if func_name == "skip" || func_name == "take" {
+                    args.first().and_then(extract_integer_literal)
+                } else {
+                    None
+                };
+                Some(vec![ChainStep {
+                    kind: ChainStepKind::Function {
+                        name: func_name,
+                        link_id,
+                        integer_arg,
+                    },
+                    link_id_span,
+                }])
             }
+        },
+        Expr::ExternalConstant { ident, .. } => {
+            let name = match ident {
+                ExternalConstantId::Identifier(id) => id.raw.clone(),
+                ExternalConstantId::String { raw, .. } if raw.len() >= 2 => {
+                    raw[1..raw.len() - 1].to_string()
+                }
+                ExternalConstantId::String { raw, .. } => raw.clone(),
+            };
+            Some(vec![ChainStep {
+                kind: ChainStepKind::External(name),
+                link_id_span: None,
+            }])
         }
-        "InvocationExpression" => {
-            let receiver = node.children.first()?;
-            let member = node.children.get(1)?;
-
-            let mut steps = decompose_chain(receiver)?;
-
-            match member.node_type {
-                "MemberInvocation" => {
-                    let ident = member.children.first()?;
-                    let name = get_identifier_name(ident)?.to_string();
+        Expr::Invocation {
+            receiver: Some(rcv),
+            call,
+            ..
+        } => {
+            let mut steps = decompose_chain(rcv)?;
+            match call {
+                Invocation::Member { ident } => {
                     steps.push(ChainStep {
-                        kind: ChainStepKind::Identifier(name),
+                        kind: ChainStepKind::Identifier(ident.raw.clone()),
                         link_id_span: None,
                     });
                 }
-                "FunctionInvocation" => {
-                    let functn = member.children.first()?;
-                    if functn.node_type != "Functn" {
-                        return None;
-                    }
-                    let func_ident = functn.children.first()?;
-                    let func_name = get_identifier_name(func_ident)?.to_string();
+                Invocation::Function { name, args, .. } => {
+                    let func_name = name.raw.clone();
                     let (link_id, link_id_span) = if func_name == "where" {
-                        match extract_link_id_from_where(functn) {
+                        match extract_link_id_from_where(args) {
                             Some((id, span)) => (Some(id), Some(span)),
                             None => (None, None),
                         }
@@ -258,7 +225,7 @@ pub(crate) fn decompose_chain(node: &AstNode) -> Option<Vec<ChainStep>> {
                         (None, None)
                     };
                     let integer_arg = if func_name == "skip" || func_name == "take" {
-                        extract_first_integer_arg(functn)
+                        args.first().and_then(extract_integer_literal)
                     } else {
                         None
                     };
@@ -271,18 +238,16 @@ pub(crate) fn decompose_chain(node: &AstNode) -> Option<Vec<ChainStep>> {
                         link_id_span,
                     });
                 }
+                // $this/$index/$total etc. shouldn't appear in chained position
                 _ => return None,
             }
-
             Some(steps)
         }
-        "IndexerExpression" => {
-            let receiver = node.children.first()?;
-            let index_expr = node.children.get(1)?;
+        Expr::Indexer { receiver, index, .. } => {
             let mut steps = decompose_chain(receiver)?;
             steps.push(ChainStep {
                 kind: ChainStepKind::Indexer {
-                    index: extract_integer_literal(index_expr),
+                    index: extract_integer_literal(index),
                 },
                 link_id_span: None,
             });
@@ -292,30 +257,12 @@ pub(crate) fn decompose_chain(node: &AstNode) -> Option<Vec<ChainStep>> {
     }
 }
 
-/// If the `Functn` node has a first argument that is an integer literal, return it.
-fn extract_first_integer_arg(functn: &AstNode) -> Option<i64> {
-    let param_list = functn.children.get(1)?;
-    if param_list.node_type != "ParamList" {
-        return None;
+/// Pull an integer value out of an Expr literal (peeling parens).
+fn extract_integer_literal(expr: &Expr) -> Option<i64> {
+    match unwrap_parens(expr) {
+        Expr::Literal(Literal::Number { raw, .. }) => raw.parse::<i64>().ok(),
+        _ => None,
     }
-    let arg = param_list.children.first()?;
-    extract_integer_literal(arg)
-}
-
-/// Walk TermExpression -> LiteralTerm -> NumberLiteral and parse its text as an integer.
-fn extract_integer_literal(node: &AstNode) -> Option<i64> {
-    let mut current = node;
-    if current.node_type == "TermExpression" {
-        current = current.children.first()?;
-    }
-    if current.node_type == "LiteralTerm" {
-        current = current.children.first()?;
-    }
-    if current.node_type == "NumberLiteral" {
-        let raw = current.terminal_node_text.first()?;
-        return raw.parse::<i64>().ok();
-    }
-    None
 }
 
 // ── QR selection state lattice ──────────────────────────────────────────
@@ -730,22 +677,25 @@ fn match_qr_path(steps: &[ChainStep]) -> MatchOutcome {
     }
 }
 
-// ── AST walkers ─────────────────────────────────────────────────────────
+// ── Expr walkers ────────────────────────────────────────────────────────
+
+/// Whether this Expr is a chain head/segment we should try to decompose.
+fn is_chain_node(expr: &Expr) -> bool {
+    matches!(
+        expr,
+        Expr::Invocation { .. } | Expr::Indexer { .. } | Expr::ExternalConstant { .. }
+    )
+}
 
 /// Pass 1: Find answer and item references by DFS over the AST.
 /// Also emits `ExpressionNotAttributable` diagnostics for chains that entered
 /// QR territory but degraded.
-fn find_answer_refs(node: &AstNode, out: &mut Vec<Annotation>, diagnostics: &mut Vec<Diagnostic>) {
-    // Try to match this node as a QR navigation chain
-    if matches!(
-        node.node_type,
-        "InvocationExpression" | "TermExpression" | "IndexerExpression"
-    ) {
-        if let Some(steps) = decompose_chain(node) {
-            let span = Span {
-                start: node.byte_start,
-                end: node.byte_end,
-            };
+fn find_answer_refs(expr: &Expr, out: &mut Vec<Annotation>, diagnostics: &mut Vec<Diagnostic>) {
+    let target = unwrap_parens(expr);
+
+    if is_chain_node(target) {
+        if let Some(steps) = decompose_chain(target) {
+            let span = span_of(target);
             match match_qr_path(&steps) {
                 MatchOutcome::Annotation(result) => {
                     let kind = match result.kind {
@@ -776,21 +726,49 @@ fn find_answer_refs(node: &AstNode, out: &mut Vec<Annotation>, diagnostics: &mut
                     return;
                 }
                 MatchOutcome::NotApplicable => {
-                    // Fall through to recurse.
+                    // Fall through to recurse generically.
                 }
             }
         }
     }
 
-    // Recurse into children
-    for child in &node.children {
-        find_answer_refs(child, out, diagnostics);
+    // Recurse into structural sub-expressions.
+    match target {
+        Expr::Binary { lhs, rhs, .. } => {
+            find_answer_refs(lhs, out, diagnostics);
+            find_answer_refs(rhs, out, diagnostics);
+        }
+        Expr::Polarity { operand, .. } => {
+            find_answer_refs(operand, out, diagnostics);
+        }
+        Expr::Type { lhs, .. } => {
+            find_answer_refs(lhs, out, diagnostics);
+        }
+        Expr::Indexer { receiver, index, .. } => {
+            find_answer_refs(receiver, out, diagnostics);
+            find_answer_refs(index, out, diagnostics);
+        }
+        Expr::Invocation { receiver, call, .. } => {
+            if let Some(r) = receiver {
+                find_answer_refs(r, out, diagnostics);
+            }
+            if let Invocation::Function { args, .. } = call {
+                for a in args {
+                    find_answer_refs(a, out, diagnostics);
+                }
+            }
+        }
+        Expr::Parenthesized { inner, .. } => {
+            find_answer_refs(inner, out, diagnostics);
+        }
+        Expr::Literal(_) | Expr::ExternalConstant { .. } => {}
     }
 }
 
-/// Check if a node's byte range overlaps with an annotation span.
-fn overlaps_annotation(node: &AstNode, ann: &Annotation) -> bool {
-    node.byte_start < ann.span.end && node.byte_end > ann.span.start
+/// Check if `expr`'s byte range overlaps with an annotation span.
+fn overlaps_annotation(expr: &Expr, ann: &Annotation) -> bool {
+    let s = expr.span();
+    s.byte_start < ann.span.end && s.byte_end > ann.span.start
 }
 
 /// Find the last linkId from an answer reference annotation.
@@ -801,170 +779,219 @@ fn last_link_id(ann: &Annotation) -> Option<&str> {
     }
 }
 
-/// Try to extract a `%factory.Coding('system', 'code')` invocation from a node.
-fn try_extract_factory_coding(node: &AstNode) -> Option<(String, Option<String>, Span)> {
-    // node should be an InvocationExpression
-    if node.node_type != "InvocationExpression" {
+/// Try to extract a `%factory.Coding('system', 'code')` invocation from an
+/// expression.
+fn try_extract_factory_coding(expr: &Expr) -> Option<(String, Option<String>, Span)> {
+    let expr = unwrap_parens(expr);
+    let Expr::Invocation {
+        receiver: Some(rcv),
+        call,
+        ..
+    } = expr
+    else {
+        return None;
+    };
+
+    // receiver should be %factory
+    let rcv = unwrap_parens(rcv);
+    let Expr::ExternalConstant { ident, .. } = rcv else {
+        return None;
+    };
+    let factory_name = match ident {
+        ExternalConstantId::Identifier(id) => id.raw.as_str(),
+        ExternalConstantId::String { raw, .. } if raw.len() >= 2 => &raw[1..raw.len() - 1],
+        _ => return None,
+    };
+    if factory_name != "factory" {
         return None;
     }
 
-    let receiver = node.children.first()?;
-    let member = node.children.get(1)?;
-
-    // receiver should be TermExpression -> ExternalConstantTerm -> ExternalConstant -> Identifier("factory")
-    if receiver.node_type != "TermExpression" {
+    let Invocation::Function { name, args, .. } = call else {
         return None;
-    }
-    let ext_term = receiver.children.first()?;
-    if ext_term.node_type != "ExternalConstantTerm" {
-        return None;
-    }
-    let ext_const = ext_term.children.first()?;
-    if ext_const.node_type != "ExternalConstant" {
-        return None;
-    }
-    let factory_ident = ext_const.children.first()?;
-    if get_identifier_name(factory_ident)? != "factory" {
+    };
+    if name.raw != "Coding" || args.len() < 2 {
         return None;
     }
 
-    // member should be FunctionInvocation -> Functn with name "Coding"
-    if member.node_type != "FunctionInvocation" {
-        return None;
-    }
-    let functn = member.children.first()?;
-    if functn.node_type != "Functn" {
-        return None;
-    }
-    let func_ident = functn.children.first()?;
-    if get_identifier_name(func_ident)? != "Coding" {
-        return None;
-    }
+    let system = extract_string_value(&args[0])?;
+    let code = extract_string_value(&args[1])?;
 
-    // ParamList with >= 2 children
-    let param_list = functn.children.get(1)?;
-    if param_list.node_type != "ParamList" || param_list.children.len() < 2 {
-        return None;
-    }
-
-    let system = extract_string_value(param_list.children.first()?)?;
-    let code = extract_string_value(param_list.children.get(1)?)?;
-
-    Some((
-        code,
-        Some(system),
-        Span {
-            start: node.byte_start,
-            end: node.byte_end,
-        },
-    ))
+    Some((code, Some(system), span_of(expr)))
 }
 
-/// Try to extract a string literal value and span from a node by searching its subtree.
-fn try_extract_string_literal(node: &AstNode) -> Option<(String, Span)> {
-    if let Some(val) = extract_string_value(node) {
-        return Some((
-            val,
-            Span {
-                start: node.byte_start,
-                end: node.byte_end,
-            },
-        ));
+/// Try to extract a string literal value and span from an expression by
+/// searching its subtree.
+fn try_extract_string_literal(expr: &Expr) -> Option<(String, Span)> {
+    let target = unwrap_parens(expr);
+    if let Some(val) = extract_string_value(target) {
+        return Some((val, span_of(target)));
     }
-    // Recurse into children
-    for child in &node.children {
-        if let Some(result) = try_extract_string_literal(child) {
-            return Some(result);
+    // Recurse — we need to mirror the legacy behavior which descended via
+    // `.children`. Walk the structural sub-expressions.
+    match target {
+        Expr::Binary { lhs, rhs, .. } => try_extract_string_literal(lhs)
+            .or_else(|| try_extract_string_literal(rhs)),
+        Expr::Polarity { operand, .. } => try_extract_string_literal(operand),
+        Expr::Type { lhs, .. } => try_extract_string_literal(lhs),
+        Expr::Indexer { receiver, index, .. } => try_extract_string_literal(receiver)
+            .or_else(|| try_extract_string_literal(index)),
+        Expr::Invocation { receiver, call, .. } => {
+            if let Some(r) = receiver {
+                if let Some(v) = try_extract_string_literal(r) {
+                    return Some(v);
+                }
+            }
+            if let Invocation::Function { args, .. } = call {
+                for a in args {
+                    if let Some(v) = try_extract_string_literal(a) {
+                        return Some(v);
+                    }
+                }
+            }
+            None
         }
+        Expr::Parenthesized { inner, .. } => try_extract_string_literal(inner),
+        Expr::Literal(_) | Expr::ExternalConstant { .. } => None,
     }
-    None
 }
 
-/// Try to extract a factory coding from a node by searching its subtree.
-fn try_extract_factory_coding_recursive(node: &AstNode) -> Option<(String, Option<String>, Span)> {
-    if let Some(result) = try_extract_factory_coding(node) {
+/// Try to extract a factory coding from an expression by searching its subtree.
+fn try_extract_factory_coding_recursive(expr: &Expr) -> Option<(String, Option<String>, Span)> {
+    if let Some(result) = try_extract_factory_coding(expr) {
         return Some(result);
     }
-    for child in &node.children {
-        if let Some(result) = try_extract_factory_coding_recursive(child) {
-            return Some(result);
+    let target = unwrap_parens(expr);
+    match target {
+        Expr::Binary { lhs, rhs, .. } => try_extract_factory_coding_recursive(lhs)
+            .or_else(|| try_extract_factory_coding_recursive(rhs)),
+        Expr::Polarity { operand, .. } => try_extract_factory_coding_recursive(operand),
+        Expr::Type { lhs, .. } => try_extract_factory_coding_recursive(lhs),
+        Expr::Indexer { receiver, index, .. } => try_extract_factory_coding_recursive(receiver)
+            .or_else(|| try_extract_factory_coding_recursive(index)),
+        Expr::Invocation { receiver, call, .. } => {
+            if let Some(r) = receiver {
+                if let Some(v) = try_extract_factory_coding_recursive(r) {
+                    return Some(v);
+                }
+            }
+            if let Invocation::Function { args, .. } = call {
+                for a in args {
+                    if let Some(v) = try_extract_factory_coding_recursive(a) {
+                        return Some(v);
+                    }
+                }
+            }
+            None
         }
+        Expr::Parenthesized { inner, .. } => try_extract_factory_coding_recursive(inner),
+        Expr::Literal(_) | Expr::ExternalConstant { .. } => None,
     }
-    None
 }
 
-/// Check if a node is fully contained within any answer ref annotation.
-fn contained_in_answer_ref(node: &AstNode, answer_refs: &[Annotation]) -> bool {
-    answer_refs.iter().any(|a| node.byte_start >= a.span.start && node.byte_end <= a.span.end)
+/// Check if an expression is fully contained within any answer ref annotation.
+fn contained_in_answer_ref(expr: &Expr, answer_refs: &[Annotation]) -> bool {
+    let s = expr.span();
+    answer_refs
+        .iter()
+        .any(|a| s.byte_start >= a.span.start && s.byte_end <= a.span.end)
 }
 
-/// Pass 2: Find coded values by scanning for equality/equivalence expressions that compare
-/// an answer reference against a code literal or factory Coding.
-fn find_coded_values(node: &AstNode, answer_refs: &[Annotation], out: &mut Vec<Annotation>) {
-    // Skip nodes fully contained within an answer ref (e.g. the linkId='x' inside where())
-    if contained_in_answer_ref(node, answer_refs) {
+/// Pass 2: Find coded values by scanning for equality/equivalence expressions
+/// that compare an answer reference against a code literal or factory Coding.
+fn find_coded_values(expr: &Expr, answer_refs: &[Annotation], out: &mut Vec<Annotation>) {
+    // Skip nodes fully contained within an answer ref (e.g. the linkId='x' inside where()).
+    if contained_in_answer_ref(expr, answer_refs) {
         return;
     }
 
-    if node.node_type == "EqualityExpression" && node.children.len() == 2 {
-        let left = &node.children[0];
-        let right = &node.children[1];
+    let target = unwrap_parens(expr);
 
-        // Find which side overlaps an answer ref
-        let (answer_ref, code_side) =
-            if let Some(ann) = answer_refs.iter().find(|a| overlaps_annotation(left, a)) {
-                (ann, right)
-            } else if let Some(ann) = answer_refs.iter().find(|a| overlaps_annotation(right, a)) {
-                (ann, left)
-            } else {
-                // No answer ref found, recurse into children
-                for child in &node.children {
-                    find_coded_values(child, answer_refs, out);
+    // Equality-family operators (=, !=, ~, !~) all lower to "EqualityExpression"
+    // in the legacy tree. We only need to look for those.
+    if let Expr::Binary { op, lhs, rhs, .. } = target {
+        if matches!(
+            op,
+            BinOp::Eq | BinOp::NotEq | BinOp::EquivTilde | BinOp::NotEquivTilde
+        ) {
+            let (answer_ref, code_side) =
+                if let Some(ann) = answer_refs.iter().find(|a| overlaps_annotation(lhs, a)) {
+                    (ann, rhs.as_ref())
+                } else if let Some(ann) = answer_refs.iter().find(|a| overlaps_annotation(rhs, a)) {
+                    (ann, lhs.as_ref())
+                } else {
+                    find_coded_values(lhs, answer_refs, out);
+                    find_coded_values(rhs, answer_refs, out);
+                    return;
+                };
+
+            let context_link_id = match last_link_id(answer_ref) {
+                Some(id) => id.to_string(),
+                None => {
+                    find_coded_values(lhs, answer_refs, out);
+                    find_coded_values(rhs, answer_refs, out);
+                    return;
                 }
-                return;
             };
 
-        let context_link_id = match last_link_id(answer_ref) {
-            Some(id) => id.to_string(),
-            None => {
-                for child in &node.children {
-                    find_coded_values(child, answer_refs, out);
-                }
+            // Try factory coding first, then string literal
+            if let Some((code, system, span)) = try_extract_factory_coding_recursive(code_side) {
+                out.push(Annotation {
+                    span,
+                    kind: AnnotationKind::CodedValue {
+                        code,
+                        system,
+                        context_link_id,
+                    },
+                    attribution: Attribution::Full,
+                });
                 return;
             }
-        };
 
-        // Try factory coding first, then string literal
-        if let Some((code, system, span)) = try_extract_factory_coding_recursive(code_side) {
-            out.push(Annotation {
-                span,
-                kind: AnnotationKind::CodedValue {
-                    code,
-                    system,
-                    context_link_id,
-                },
-                attribution: Attribution::Full,
-            });
-            return;
-        }
-
-        if let Some((value, span)) = try_extract_string_literal(code_side) {
-            out.push(Annotation {
-                span,
-                kind: AnnotationKind::CodedValue {
-                    code: value,
-                    system: None,
-                    context_link_id,
-                },
-                attribution: Attribution::Full,
-            });
-            return;
+            if let Some((value, span)) = try_extract_string_literal(code_side) {
+                out.push(Annotation {
+                    span,
+                    kind: AnnotationKind::CodedValue {
+                        code: value,
+                        system: None,
+                        context_link_id,
+                    },
+                    attribution: Attribution::Full,
+                });
+                return;
+            }
         }
     }
 
-    // Recurse into children
-    for child in &node.children {
-        find_coded_values(child, answer_refs, out);
+    // Recurse into structural children
+    match target {
+        Expr::Binary { lhs, rhs, .. } => {
+            find_coded_values(lhs, answer_refs, out);
+            find_coded_values(rhs, answer_refs, out);
+        }
+        Expr::Polarity { operand, .. } => {
+            find_coded_values(operand, answer_refs, out);
+        }
+        Expr::Type { lhs, .. } => {
+            find_coded_values(lhs, answer_refs, out);
+        }
+        Expr::Indexer { receiver, index, .. } => {
+            find_coded_values(receiver, answer_refs, out);
+            find_coded_values(index, answer_refs, out);
+        }
+        Expr::Invocation { receiver, call, .. } => {
+            if let Some(r) = receiver {
+                find_coded_values(r, answer_refs, out);
+            }
+            if let Invocation::Function { args, .. } = call {
+                for a in args {
+                    find_coded_values(a, answer_refs, out);
+                }
+            }
+        }
+        Expr::Parenthesized { inner, .. } => {
+            find_coded_values(inner, answer_refs, out);
+        }
+        Expr::Literal(_) | Expr::ExternalConstant { .. } => {}
     }
 }
 
@@ -990,22 +1017,19 @@ pub(crate) fn annotate_expression_with_diagnostics(
 /// (notably `result_type::infer_result_type`) instead of reparsing.
 pub(crate) fn annotate_expression_with_ast(
     expr: &str,
-) -> Result<(AstNode, Vec<Annotation>, Vec<Diagnostic>), crate::ParseError> {
-    let tokens = crate::lexer::tokenize(expr)?;
-    let mut p = crate::parser::Parser::new(&tokens);
-    let typed = p.parse_entire_expression()?;
-    let root = crate::compat::lower(&typed, &tokens);
+) -> Result<(Expr, Vec<Annotation>, Vec<Diagnostic>), crate::ParseError> {
+    let typed = crate::parse(expr)?;
 
     let mut answer_refs = Vec::new();
     let mut diagnostics = Vec::new();
-    find_answer_refs(&root, &mut answer_refs, &mut diagnostics);
+    find_answer_refs(&typed, &mut answer_refs, &mut diagnostics);
 
     let mut coded_values = Vec::new();
-    find_coded_values(&root, &answer_refs, &mut coded_values);
+    find_coded_values(&typed, &answer_refs, &mut coded_values);
 
     let mut all: Vec<Annotation> = answer_refs.into_iter().chain(coded_values).collect();
     all.sort_by_key(|a| a.span.start);
-    Ok((root, all, diagnostics))
+    Ok((typed, all, diagnostics))
 }
 
 // ── Tests ───────────────────────────────────────────────────────────────
