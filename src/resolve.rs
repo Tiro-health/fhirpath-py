@@ -4,7 +4,9 @@
 /// reference in `expr` with the parsed `base` AST, then serializes the
 /// result back to a valid FHIRPath string.
 
-use crate::compat::AstNode;
+use crate::ast::{
+    Expr, ExternalConstantId, Invocation, Literal, QualifiedIdentifier, TypeSpecifier, Unit,
+};
 use crate::ParseError;
 
 // ── Public API ─────────────────────────────────────────────────────────
@@ -15,198 +17,207 @@ use crate::ParseError;
 /// serialized result.  Returns `expr` unchanged when no `%context` reference
 /// exists.
 pub fn resolve_context(expr: &str, base: &str) -> Result<String, ParseError> {
-    let (expr_ast, _) = crate::parse_with_compat(expr)?;
-    let (base_ast, _) = crate::parse_with_compat(base)?;
+    let expr_ast = crate::parse(expr)?;
+    let base_ast = crate::parse(base)?;
     let resolved = resolve_context_ast(&expr_ast, &base_ast);
-    Ok(ast_to_string(&resolved))
+    Ok(expr_to_string(&resolved))
 }
 
 /// AST-level substitution: replace every `%context` node in `expr_ast` with
 /// a clone of `base_ast`.
-pub fn resolve_context_ast(expr_ast: &AstNode, base_ast: &AstNode) -> AstNode {
+pub fn resolve_context_ast(expr_ast: &Expr, base_ast: &Expr) -> Expr {
     substitute(expr_ast, "context", base_ast)
 }
 
 // ── Substitution ───────────────────────────────────────────────────────
 
-/// Recursively walk `node`, replacing any `TermExpression` that wraps
-/// `ExternalConstantTerm → ExternalConstant → Identifier(name)` with a
-/// clone of `replacement`.
-fn substitute(node: &AstNode, name: &str, replacement: &AstNode) -> AstNode {
-    if is_external_constant_term_expr(node, name) {
-        return replacement.clone();
+/// Recursively walk `expr`, replacing any `ExternalConstant` with the given
+/// constant name with a clone of `replacement`.
+fn substitute(expr: &Expr, name: &str, replacement: &Expr) -> Expr {
+    match expr {
+        Expr::ExternalConstant { ident, .. } => {
+            if external_constant_name(ident) == Some(name) {
+                replacement.clone()
+            } else {
+                expr.clone()
+            }
+        }
+        Expr::Binary { op, lhs, rhs, span } => Expr::Binary {
+            op: *op,
+            lhs: Box::new(substitute(lhs, name, replacement)),
+            rhs: Box::new(substitute(rhs, name, replacement)),
+            span: span.clone(),
+        },
+        Expr::Polarity { op, operand, span } => Expr::Polarity {
+            op: *op,
+            operand: Box::new(substitute(operand, name, replacement)),
+            span: span.clone(),
+        },
+        Expr::Type {
+            lhs,
+            op,
+            type_spec,
+            span,
+        } => Expr::Type {
+            lhs: Box::new(substitute(lhs, name, replacement)),
+            op: *op,
+            type_spec: type_spec.clone(),
+            span: span.clone(),
+        },
+        Expr::Indexer {
+            receiver,
+            index,
+            span,
+        } => Expr::Indexer {
+            receiver: Box::new(substitute(receiver, name, replacement)),
+            index: Box::new(substitute(index, name, replacement)),
+            span: span.clone(),
+        },
+        Expr::Invocation {
+            receiver,
+            call,
+            span,
+        } => {
+            let new_receiver = receiver
+                .as_ref()
+                .map(|r| Box::new(substitute(r, name, replacement)));
+            let new_call = match call {
+                Invocation::Function {
+                    name: fname,
+                    args,
+                    span: fspan,
+                } => Invocation::Function {
+                    name: fname.clone(),
+                    args: args.iter().map(|a| substitute(a, name, replacement)).collect(),
+                    span: fspan.clone(),
+                },
+                _ => call.clone(),
+            };
+            Expr::Invocation {
+                receiver: new_receiver,
+                call: new_call,
+                span: span.clone(),
+            }
+        }
+        Expr::Parenthesized { inner, span } => Expr::Parenthesized {
+            inner: Box::new(substitute(inner, name, replacement)),
+            span: span.clone(),
+        },
+        // Literals and ExternalConstant{non-matching} are returned as-is.
+        Expr::Literal(_) => expr.clone(),
     }
-
-    let mut result = node.clone();
-    result.children = node
-        .children
-        .iter()
-        .map(|child| substitute(child, name, replacement))
-        .collect();
-    result
 }
 
-/// Check whether `node` is `TermExpression > ExternalConstantTerm >
-/// ExternalConstant > Identifier` with the given constant name.
-fn is_external_constant_term_expr(node: &AstNode, name: &str) -> bool {
-    if node.node_type != "TermExpression" {
-        return false;
+fn external_constant_name(ident: &ExternalConstantId) -> Option<&str> {
+    match ident {
+        ExternalConstantId::Identifier(id) => Some(id.raw.as_str()),
+        // ExternalConstantId::String stores the raw value INCLUDING the
+        // surrounding quotes — strip them before comparing to the bare name.
+        ExternalConstantId::String { raw, .. } => {
+            if raw.len() >= 2 {
+                Some(&raw[1..raw.len() - 1])
+            } else {
+                None
+            }
+        }
     }
-    let Some(ect) = node.children.first() else { return false };
-    if ect.node_type != "ExternalConstantTerm" {
-        return false;
-    }
-    let Some(ec) = ect.children.first() else { return false };
-    if ec.node_type != "ExternalConstant" {
-        return false;
-    }
-    let Some(ident) = ec.children.first() else { return false };
-    if ident.node_type != "Identifier" {
-        return false;
-    }
-    ident.terminal_node_text.first().map(|s| s.as_str()) == Some(name)
 }
 
-// ── AST → FHIRPath string ─────────────────────────────────────────────
+// ── Expr → FHIRPath string ────────────────────────────────────────────
 
-/// Serialize an `AstNode` back to a valid FHIRPath expression string.
-pub fn ast_to_string(node: &AstNode) -> String {
-    match node.node_type {
-        // ── Binary expressions ──────────────────────────────────────
-        "ImpliesExpression" | "OrExpression" | "AndExpression"
-        | "MembershipExpression" | "EqualityExpression"
-        | "InequalityExpression" | "UnionExpression" | "AdditiveExpression"
-        | "MultiplicativeExpression" => {
-            // children: [left, right], terminal_node_text: [operator]
-            let left = ast_to_string(&node.children[0]);
-            let right = ast_to_string(&node.children[1]);
-            let op = &node.terminal_node_text[0];
-            format!("{left} {op} {right}")
+/// Serialize an `Expr` back to a valid FHIRPath expression string.
+pub fn expr_to_string(expr: &Expr) -> String {
+    match expr {
+        Expr::Binary { op, lhs, rhs, .. } => {
+            let left = expr_to_string(lhs);
+            let right = expr_to_string(rhs);
+            format!("{left} {op} {right}", op = op.keyword())
         }
-
-        // ── Type expression (is/as) ────────────────────────────────
-        "TypeExpression" => {
-            let left = ast_to_string(&node.children[0]);
-            let type_spec = ast_to_string(&node.children[1]);
-            let op = &node.terminal_node_text[0];
-            format!("{left} {op} {type_spec}")
+        Expr::Type { lhs, op, type_spec, .. } => {
+            let left = expr_to_string(lhs);
+            let ts = type_specifier_to_string(type_spec);
+            format!("{left} {op} {ts}", op = op.keyword())
         }
-
-        // ── Unary ──────────────────────────────────────────────────
-        "PolarityExpression" => {
-            let op = &node.terminal_node_text[0];
-            let operand = ast_to_string(&node.children[0]);
-            format!("{op}{operand}")
+        Expr::Polarity { op, operand, .. } => {
+            let inner = expr_to_string(operand);
+            format!("{op}{inner}", op = op.keyword())
         }
-
-        // ── Postfix ────────────────────────────────────────────────
-        "InvocationExpression" => {
-            let left = ast_to_string(&node.children[0]);
-            let right = ast_to_string(&node.children[1]);
+        Expr::Indexer { receiver, index, .. } => {
+            let r = expr_to_string(receiver);
+            let i = expr_to_string(index);
+            format!("{r}[{i}]")
+        }
+        Expr::Invocation {
+            receiver: Some(rcv),
+            call,
+            ..
+        } => {
+            let left = expr_to_string(rcv);
+            let right = invocation_to_string(call);
             format!("{left}.{right}")
         }
-
-        "IndexerExpression" => {
-            let left = ast_to_string(&node.children[0]);
-            let index = ast_to_string(&node.children[1]);
-            format!("{left}[{index}]")
+        Expr::Invocation {
+            receiver: None,
+            call,
+            ..
+        } => invocation_to_string(call),
+        Expr::Parenthesized { inner, .. } => {
+            let s = expr_to_string(inner);
+            format!("({s})")
         }
+        Expr::Literal(lit) => literal_to_string(lit),
+        Expr::ExternalConstant { ident, .. } => match ident {
+            ExternalConstantId::Identifier(id) => format!("%{}", id.raw),
+            ExternalConstantId::String { raw, .. } => format!("%{}", raw),
+        },
+    }
+}
 
-        // ── Terms (single-child wrappers) ──────────────────────────
-        "TermExpression" | "LiteralTerm" | "InvocationTerm"
-        | "ExternalConstantTerm" | "QuantityLiteral" | "TypeSpecifier" => {
-            ast_to_string(&node.children[0])
+fn invocation_to_string(inv: &Invocation) -> String {
+    match inv {
+        Invocation::Member { ident } => ident.raw.clone(),
+        Invocation::Function { name, args, .. } => {
+            let arg_strs: Vec<String> = args.iter().map(expr_to_string).collect();
+            format!("{}({})", name.raw, arg_strs.join(", "))
         }
+        Invocation::This { .. } => "$this".to_string(),
+        Invocation::Index { .. } => "$index".to_string(),
+        Invocation::Total { .. } => "$total".to_string(),
+    }
+}
 
-        // ── Parenthesized ──────────────────────────────────────────
-        "ParenthesizedTerm" => {
-            let inner = ast_to_string(&node.children[0]);
-            format!("({inner})")
-        }
-
-        // ── External constant (%name) ──────────────────────────────
-        "ExternalConstant" => {
-            let ident = ast_to_string(&node.children[0]);
-            format!("%{ident}")
-        }
-
-        // ── Invocations ────────────────────────────────────────────
-        "MemberInvocation" => ast_to_string(&node.children[0]),
-
-        "FunctionInvocation" => ast_to_string(&node.children[0]),
-
-        "Functn" => {
-            // children[0] = Identifier, children[1] = optional ParamList
-            let name = ast_to_string(&node.children[0]);
-            if node.children.len() > 1 {
-                let params = ast_to_string(&node.children[1]);
-                format!("{name}({params})")
-            } else {
-                format!("{name}()")
-            }
-        }
-
-        "ParamList" => {
-            // children = [expr, expr, ...], separated by commas
-            node.children
-                .iter()
-                .map(ast_to_string)
-                .collect::<Vec<_>>()
-                .join(", ")
-        }
-
-        // ── Special invocations ────────────────────────────────────
-        "ThisInvocation" | "IndexInvocation" | "TotalInvocation" => {
-            node.terminal_node_text[0].clone()
-        }
-
-        // ── Identifier ─────────────────────────────────────────────
-        "Identifier" => node.terminal_node_text[0].clone(),
-
-        // ── Qualified identifier (for type specifiers) ─────────────
-        "QualifiedIdentifier" => {
-            node.children
-                .iter()
-                .map(ast_to_string)
-                .collect::<Vec<_>>()
-                .join(".")
-        }
-
-        // ── Literals ───────────────────────────────────────────────
-        "NullLiteral" => "{}".to_string(),
-
-        "BooleanLiteral" | "StringLiteral" | "NumberLiteral"
-        | "DateTimeLiteral" | "TimeLiteral" => {
-            node.terminal_node_text[0].clone()
-        }
-
-        // ── Quantity (number + unit) ───────────────────────────────
-        "Quantity" => {
-            let number = &node.terminal_node_text[0];
-            let unit = ast_to_string(&node.children[0]);
-            format!("{number} {unit}")
-        }
-
-        "Unit" => {
-            if !node.children.is_empty() {
-                // DateTimePrecision or PluralDateTimePrecision
-                ast_to_string(&node.children[0])
-            } else {
-                // String-literal unit (e.g. 'mg')
-                node.terminal_node_text[0].clone()
-            }
-        }
-
-        "DateTimePrecision" | "PluralDateTimePrecision" => {
-            node.terminal_node_text[0].clone()
-        }
-
-        // Fallback — shouldn't happen with a well-formed AST
-        _ => {
-            eprintln!("ast_to_string: unknown node type {:?}", node.node_type);
-            String::new()
+fn literal_to_string(lit: &Literal) -> String {
+    match lit {
+        Literal::Null { .. } => "{}".to_string(),
+        Literal::Boolean { value, .. } => if *value { "true" } else { "false" }.to_string(),
+        Literal::String { raw, .. } => raw.clone(),
+        Literal::Number { raw, .. } => raw.clone(),
+        Literal::DateTime { raw, .. } => raw.clone(),
+        Literal::Time { raw, .. } => raw.clone(),
+        Literal::Quantity { number, unit, .. } => {
+            format!("{} {}", number, unit_to_string(unit))
         }
     }
+}
+
+fn unit_to_string(unit: &Unit) -> String {
+    match unit {
+        Unit::String { raw, .. } => raw.clone(),
+        Unit::DateTimePrecision { word, .. } => word.clone(),
+        Unit::PluralDateTimePrecision { word, .. } => word.clone(),
+    }
+}
+
+fn type_specifier_to_string(ts: &TypeSpecifier) -> String {
+    qualified_identifier_to_string(&ts.qualified)
+}
+
+fn qualified_identifier_to_string(qi: &QualifiedIdentifier) -> String {
+    qi.parts
+        .iter()
+        .map(|i| i.raw.clone())
+        .collect::<Vec<_>>()
+        .join(".")
 }
 
 #[cfg(test)]
@@ -214,8 +225,8 @@ mod tests {
     use super::*;
 
     fn roundtrip(expr: &str) -> String {
-        let (ast, _) = crate::parse_with_compat(expr).unwrap();
-        ast_to_string(&ast)
+        let ast = crate::parse(expr).unwrap();
+        expr_to_string(&ast)
     }
 
     #[test]
