@@ -391,8 +391,5 @@ pub fn _rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
 
 /// Internal helper: parse and also return the token stream (needed for text computation).
 fn rust_parse_with_tokens(expr: &str) -> Result<(AstNode, Vec<Token>), crate::ParseError> {
-    let tokens = crate::lexer::tokenize(expr)?;
-    let mut p = crate::parser::Parser::new(&tokens);
-    let ast = p.parse_entire_expression()?;
-    Ok((ast, tokens))
+    crate::parse_with_compat(expr)
 }

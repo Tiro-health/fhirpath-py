@@ -14,7 +14,7 @@ use crate::analyze::questionnaire_index::QuestionnaireIndex;
 use crate::analyze::{
     Annotation, AnnotationKind, Attribution, Cardinality, InferredType, ValueAccessor,
 };
-use crate::parser::AstNode;
+use crate::compat::AstNode;
 
 /// Map a Questionnaire item type + value-accessor to an inferred result type.
 ///

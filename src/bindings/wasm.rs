@@ -29,7 +29,7 @@ fn convert_diagnostic_spans(diagnostics: &mut [analyze::Diagnostic], expr: &str)
 /// Returns the AST as a JavaScript object.
 #[wasm_bindgen]
 pub fn parse(expr: &str) -> Result<JsValue, JsError> {
-    let ast = crate::parse(expr).map_err(|e| JsError::new(&e.to_string()))?;
+    let (ast, _) = crate::parse_with_compat(expr).map_err(|e| JsError::new(&e.to_string()))?;
     serde_wasm_bindgen::to_value(&ast).map_err(|e| JsError::new(&e.to_string()))
 }
 

@@ -4,7 +4,7 @@
 /// reference in `expr` with the parsed `base` AST, then serializes the
 /// result back to a valid FHIRPath string.
 
-use crate::parser::AstNode;
+use crate::compat::AstNode;
 use crate::ParseError;
 
 // ── Public API ─────────────────────────────────────────────────────────
@@ -15,8 +15,8 @@ use crate::ParseError;
 /// serialized result.  Returns `expr` unchanged when no `%context` reference
 /// exists.
 pub fn resolve_context(expr: &str, base: &str) -> Result<String, ParseError> {
-    let expr_ast = crate::parse(expr)?;
-    let base_ast = crate::parse(base)?;
+    let (expr_ast, _) = crate::parse_with_compat(expr)?;
+    let (base_ast, _) = crate::parse_with_compat(base)?;
     let resolved = resolve_context_ast(&expr_ast, &base_ast);
     Ok(ast_to_string(&resolved))
 }
@@ -214,7 +214,7 @@ mod tests {
     use super::*;
 
     fn roundtrip(expr: &str) -> String {
-        let ast = crate::parse(expr).unwrap();
+        let (ast, _) = crate::parse_with_compat(expr).unwrap();
         ast_to_string(&ast)
     }
 

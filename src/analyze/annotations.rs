@@ -4,7 +4,7 @@
 /// (e.g. `item.where(linkId='x').answer.value.code`).
 /// Pass 2 identifies coded values in equality/equivalence comparisons against those references.
 
-use crate::parser::AstNode;
+use crate::compat::AstNode;
 
 use super::{Annotation, AnnotationKind, Attribution, Diagnostic, DiagnosticCode, Severity, Span, ValueAccessor};
 
@@ -993,7 +993,8 @@ pub(crate) fn annotate_expression_with_ast(
 ) -> Result<(AstNode, Vec<Annotation>, Vec<Diagnostic>), crate::ParseError> {
     let tokens = crate::lexer::tokenize(expr)?;
     let mut p = crate::parser::Parser::new(&tokens);
-    let root = p.parse_entire_expression()?;
+    let typed = p.parse_entire_expression()?;
+    let root = crate::compat::lower(&typed, &tokens);
 
     let mut answer_refs = Vec::new();
     let mut diagnostics = Vec::new();

@@ -7,17 +7,26 @@ pub mod parser;
 pub mod resolve;
 pub mod utf16;
 
+pub use ast::Expr;
+pub use compat::AstNode;
 pub use lexer::{Token, TokenKind};
-pub use parser::AstNode;
 
 use lexer::tokenize;
 use parser::Parser;
 
-/// Byte offset range into the source string.
+/// Byte offset range into the source string, plus the corresponding
+/// half-open token-index range `[token_start..token_end)` into the lexer's
+/// token vector. The token range is what the lowering layer (Phase 3) uses to
+/// reproduce the legacy `AstNode` tree's `compute_text` output.
+///
+/// Error sites that don't have a meaningful token position can leave
+/// `token_start == token_end == 0`.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct Span {
     pub byte_start: usize,
     pub byte_end: usize,
+    pub token_start: usize,
+    pub token_end: usize,
 }
 
 /// Typed parse error for the FHIRPath lexer + parser.
@@ -140,11 +149,23 @@ impl std::fmt::Display for ParseError {
 
 impl std::error::Error for ParseError {}
 
-/// Parse a FHIRPath expression string into an AST.
-pub fn parse(expr: &str) -> Result<AstNode, ParseError> {
+/// Parse a FHIRPath expression string into a typed `Expr` tree.
+pub fn parse(expr: &str) -> Result<Expr, ParseError> {
     let tokens = tokenize(expr)?;
     let mut p = Parser::new(&tokens);
     p.parse_entire_expression()
+}
+
+/// Parse a FHIRPath expression and lower it to the legacy ANTLR-shaped
+/// `AstNode` tree, returning both the lowered tree and the underlying
+/// token vector. Callers that need `compute_text` or other token-aware
+/// behavior should use this; new code should prefer [`parse`].
+pub fn parse_with_compat(expr: &str) -> Result<(AstNode, Vec<Token>), ParseError> {
+    let tokens = tokenize(expr)?;
+    let mut p = Parser::new(&tokens);
+    let expr_ast = p.parse_entire_expression()?;
+    let ast = compat::lower(&expr_ast, &tokens);
+    Ok((ast, tokens))
 }
 
 // Re-export the PyO3 module entry point when the python feature is enabled.
