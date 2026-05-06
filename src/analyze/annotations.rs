@@ -990,7 +990,7 @@ pub(crate) fn annotate_expression_with_diagnostics(
 /// (notably `result_type::infer_result_type`) instead of reparsing.
 pub(crate) fn annotate_expression_with_ast(
     expr: &str,
-) -> Result<(AstNode, Vec<Annotation>, Vec<Diagnostic>), crate::ParseError> {
+) -> Result<(crate::ast::Expr, Vec<Annotation>, Vec<Diagnostic>), crate::ParseError> {
     let tokens = crate::lexer::tokenize(expr)?;
     let mut p = crate::parser::Parser::new(&tokens);
     let typed = p.parse_entire_expression()?;
@@ -1005,7 +1005,7 @@ pub(crate) fn annotate_expression_with_ast(
 
     let mut all: Vec<Annotation> = answer_refs.into_iter().chain(coded_values).collect();
     all.sort_by_key(|a| a.span.start);
-    Ok((root, all, diagnostics))
+    Ok((typed, all, diagnostics))
 }
 
 // ── Tests ───────────────────────────────────────────────────────────────

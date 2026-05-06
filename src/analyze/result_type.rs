@@ -14,7 +14,7 @@ use crate::analyze::questionnaire_index::QuestionnaireIndex;
 use crate::analyze::{
     Annotation, AnnotationKind, Attribution, Cardinality, InferredType, ValueAccessor,
 };
-use crate::compat::AstNode;
+use crate::ast::{BinOp, Expr, Invocation, Literal, TypeOp, TypeSpecifier};
 
 /// Map a Questionnaire item type + value-accessor to an inferred result type.
 ///
@@ -40,36 +40,11 @@ fn answer_leaf_type(item_type: &str, accessor: &ValueAccessor) -> InferredType {
     }
 }
 
-/// Look up the function name from a `FunctionInvocation` AST node.
-fn function_name(fi: &AstNode) -> Option<&str> {
-    if fi.node_type != "FunctionInvocation" {
-        return None;
-    }
-    let functn = fi.children.first()?;
-    if functn.node_type != "Functn" {
-        return None;
-    }
-    let ident = functn.children.first()?;
-    if ident.node_type != "Identifier" {
-        return None;
-    }
-    ident.terminal_node_text.first().map(|s| s.as_str())
-}
-
 /// Read the type-spec name out of a `TypeSpecifier` (used by `is` / `as` /
 /// `ofType`). Returns the unqualified head identifier — good enough for
 /// matching well-known FHIRPath / FHIR primitive names.
-fn type_specifier_name(node: &AstNode) -> Option<&str> {
-    if node.node_type != "TypeSpecifier" {
-        return None;
-    }
-    let qi = node.children.first()?;
-    // QualifiedIdentifier { children: [Identifier, ...] }
-    let first_part = qi.children.first()?;
-    if first_part.node_type != "Identifier" {
-        return None;
-    }
-    first_part.terminal_node_text.first().map(|s| s.as_str())
+fn type_specifier_name(ts: &TypeSpecifier) -> Option<&str> {
+    ts.qualified.parts.first().map(|id| id.raw.as_str())
 }
 
 /// Map a FHIR / FHIRPath type specifier name (e.g. `Boolean`, `boolean`,
@@ -91,13 +66,32 @@ fn type_name_to_inferred(name: &str) -> InferredType {
     }
 }
 
+/// If the argument is itself an `Expr::Invocation` with a Member call whose
+/// identifier names a type, return that name. Used by `ofType(Coding)` etc.
+fn arg_to_type_name(expr: &Expr) -> Option<&str> {
+    let expr = unwrap_passthrough(expr);
+    match expr {
+        Expr::Invocation {
+            receiver: None,
+            call: Invocation::Member { ident },
+            ..
+        } => Some(ident.raw.as_str()),
+        _ => None,
+    }
+}
+
+/// Read the type-spec name from a `Type` expression's TypeSpecifier.
+fn type_op_name(ts: &TypeSpecifier) -> Option<&str> {
+    type_specifier_name(ts)
+}
+
 /// Result-type lookup for a function call, given the (already-inferred) type
 /// of its receiver chain. `args` is the list of argument expressions if any
 /// (for `ofType`, `as`, `iif`).
 fn function_result_type(
     name: &str,
     receiver: InferredType,
-    args: &[&AstNode],
+    args: &[&Expr],
     index: &QuestionnaireIndex,
     annotations: &[Annotation],
 ) -> InferredType {
@@ -172,7 +166,7 @@ fn function_result_type(
     // ── Type-asserting (preserve the asserted type) ──────────────────────
     if name == "ofType" || name == "as" {
         if let Some(arg) = args.first() {
-            if let Some(tn) = type_specifier_name(arg) {
+            if let Some(tn) = arg_to_type_name(arg) {
                 return type_name_to_inferred(tn);
             }
         }
@@ -209,39 +203,24 @@ fn function_result_type(
     }
 }
 
-/// Strip wrapper nodes that don't affect type (`TermExpression`,
-/// `ParenthesizedTerm`, `LiteralTerm`, `InvocationTerm`).
-fn unwrap_passthrough<'a>(mut node: &'a AstNode) -> &'a AstNode {
-    loop {
-        match node.node_type {
-            "TermExpression" | "LiteralTerm" | "InvocationTerm" => {
-                if let Some(c) = node.children.first() {
-                    node = c;
-                } else {
-                    return node;
-                }
-            }
-            "ParenthesizedTerm" => {
-                if let Some(c) = node.children.first() {
-                    node = c;
-                } else {
-                    return node;
-                }
-            }
-            _ => return node,
-        }
+/// Strip parenthesized wrappers that don't affect type/cardinality.
+fn unwrap_passthrough(mut node: &Expr) -> &Expr {
+    while let Expr::Parenthesized { inner, .. } = node {
+        node = inner;
     }
+    node
 }
 
 /// Try to resolve an InvocationExpression chain to an answer-leaf type by
 /// matching it against an existing annotation.
 fn answer_leaf_for_chain(
-    node: &AstNode,
+    node: &Expr,
     annotations: &[Annotation],
     index: &QuestionnaireIndex,
 ) -> Option<InferredType> {
+    let span = node.span();
     for ann in annotations {
-        if ann.span.start != node.byte_start || ann.span.end != node.byte_end {
+        if ann.span.start != span.byte_start || ann.span.end != span.byte_end {
             continue;
         }
         // Skip degraded attribution — path is no longer precise.
@@ -261,208 +240,145 @@ fn answer_leaf_for_chain(
 }
 
 /// Recursive type inference on a single AST node.
-fn infer_node(node: &AstNode, annotations: &[Annotation], index: &QuestionnaireIndex) -> InferredType {
+fn infer_node(node: &Expr, annotations: &[Annotation], index: &QuestionnaireIndex) -> InferredType {
     let node = unwrap_passthrough(node);
 
-    match node.node_type {
+    match node {
         // ── Literals ──
-        "BooleanLiteral" => InferredType::Boolean,
-        "StringLiteral" => InferredType::String,
-        "NumberLiteral" => {
-            let raw = node
-                .terminal_node_text
-                .first()
-                .map(|s| s.as_str())
-                .unwrap_or("");
-            if raw.contains('.') {
-                InferredType::Decimal
-            } else {
-                InferredType::Integer
+        Expr::Literal(lit) => match lit {
+            Literal::Boolean { .. } => InferredType::Boolean,
+            Literal::String { .. } => InferredType::String,
+            Literal::Number { raw, .. } => {
+                if raw.contains('.') {
+                    InferredType::Decimal
+                } else {
+                    InferredType::Integer
+                }
             }
-        }
-        "DateTimeLiteral" => {
-            // FHIRPath date-time literals start with `@`. Presence of `T`
-            // distinguishes a date-time from a bare date.
-            let raw = node
-                .terminal_node_text
-                .first()
-                .map(|s| s.as_str())
-                .unwrap_or("");
-            if raw.contains('T') {
-                InferredType::DateTime
-            } else {
-                InferredType::Date
+            Literal::DateTime { raw, .. } => {
+                // FHIRPath date-time literals start with `@`. Presence of `T`
+                // distinguishes a date-time from a bare date.
+                if raw.contains('T') {
+                    InferredType::DateTime
+                } else {
+                    InferredType::Date
+                }
             }
-        }
-        "TimeLiteral" => InferredType::Time,
-        "QuantityLiteral" => InferredType::Quantity,
-        "NullLiteral" => InferredType::Unknown,
+            Literal::Time { .. } => InferredType::Time,
+            Literal::Quantity { .. } => InferredType::Quantity,
+            Literal::Null { .. } => InferredType::Unknown,
+        },
 
         // ── Boolean-producing operators ──
-        "EqualityExpression"
-        | "InequalityExpression"
-        | "MembershipExpression"
-        | "AndExpression"
-        | "OrExpression"
-        | "ImpliesExpression" => InferredType::Boolean,
+        Expr::Binary { op, lhs, rhs, .. } => match op {
+            BinOp::Eq
+            | BinOp::NotEq
+            | BinOp::EquivTilde
+            | BinOp::NotEquivTilde
+            | BinOp::Lt
+            | BinOp::Gt
+            | BinOp::LtEq
+            | BinOp::GtEq
+            | BinOp::In
+            | BinOp::Contains
+            | BinOp::And
+            | BinOp::Or
+            | BinOp::Xor
+            | BinOp::Implies => InferredType::Boolean,
 
-        "TypeExpression" => {
-            let op = node
-                .terminal_node_text
-                .first()
-                .map(|s| s.as_str())
-                .unwrap_or("");
-            if op == "is" {
-                InferredType::Boolean
-            } else if op == "as" {
-                // `expr as Type` → inferred type from the TypeSpecifier.
-                node.children
-                    .get(1)
-                    .and_then(type_specifier_name)
-                    .map(type_name_to_inferred)
-                    .unwrap_or(InferredType::Unknown)
-            } else {
-                InferredType::Unknown
-            }
-        }
+            BinOp::Concat => InferredType::String,
 
-        // ── Arithmetic ──
-        "AdditiveExpression" => {
-            let op = node
-                .terminal_node_text
-                .first()
-                .map(|s| s.as_str())
-                .unwrap_or("");
-            if op == "&" {
-                return InferredType::String;
+            BinOp::Plus | BinOp::Minus => {
+                let l = infer_node(lhs, annotations, index);
+                let r = infer_node(rhs, annotations, index);
+                numeric_combine(l, r)
             }
-            let left = node
-                .children
-                .first()
-                .map(|c| infer_node(c, annotations, index))
-                .unwrap_or(InferredType::Unknown);
-            let right = node
-                .children
-                .get(1)
-                .map(|c| infer_node(c, annotations, index))
-                .unwrap_or(InferredType::Unknown);
-            numeric_combine(left, right)
-        }
-        "MultiplicativeExpression" => {
-            let left = node
-                .children
-                .first()
-                .map(|c| infer_node(c, annotations, index))
-                .unwrap_or(InferredType::Unknown);
-            let right = node
-                .children
-                .get(1)
-                .map(|c| infer_node(c, annotations, index))
-                .unwrap_or(InferredType::Unknown);
-            // div / mod produce Integer when both sides are Integer; otherwise
-            // pass through the numeric combine rules.
-            let op = node
-                .terminal_node_text
-                .first()
-                .map(|s| s.as_str())
-                .unwrap_or("");
-            if op == "div" || op == "mod" {
-                if matches!(left, InferredType::Integer)
-                    && matches!(right, InferredType::Integer)
+            BinOp::Mul => {
+                let l = infer_node(lhs, annotations, index);
+                let r = infer_node(rhs, annotations, index);
+                numeric_combine(l, r)
+            }
+            BinOp::TrueDiv => {
+                let l = infer_node(lhs, annotations, index);
+                let r = infer_node(rhs, annotations, index);
+                if matches!(l, InferredType::Integer | InferredType::Decimal)
+                    && matches!(r, InferredType::Integer | InferredType::Decimal)
                 {
-                    return InferredType::Integer;
+                    InferredType::Decimal
+                } else {
+                    numeric_combine(l, r)
                 }
-                if matches!(
-                    left,
-                    InferredType::Integer | InferredType::Decimal
-                ) && matches!(
-                    right,
-                    InferredType::Integer | InferredType::Decimal
-                ) {
-                    return InferredType::Decimal;
+            }
+            BinOp::IntDiv | BinOp::Mod => {
+                let l = infer_node(lhs, annotations, index);
+                let r = infer_node(rhs, annotations, index);
+                if matches!(l, InferredType::Integer) && matches!(r, InferredType::Integer) {
+                    InferredType::Integer
+                } else if matches!(l, InferredType::Integer | InferredType::Decimal)
+                    && matches!(r, InferredType::Integer | InferredType::Decimal)
+                {
+                    InferredType::Decimal
+                } else {
+                    InferredType::Unknown
                 }
-                return InferredType::Unknown;
             }
-            // `/` always yields Decimal in FHIRPath
-            if op == "/"
-                && matches!(left, InferredType::Integer | InferredType::Decimal)
-                && matches!(right, InferredType::Integer | InferredType::Decimal)
-            {
-                return InferredType::Decimal;
+            // Union `a | b` — same type if both operands agree, else Unknown.
+            BinOp::Union => {
+                let l = infer_node(lhs, annotations, index);
+                let r = infer_node(rhs, annotations, index);
+                if l == r {
+                    l
+                } else {
+                    InferredType::Unknown
+                }
             }
-            numeric_combine(left, right)
-        }
-        "PolarityExpression" => node
-            .children
-            .first()
-            .map(|c| infer_node(c, annotations, index))
-            .unwrap_or(InferredType::Unknown),
+        },
 
-        // ── Function chains ──
-        "InvocationExpression" => {
+        Expr::Type { op, type_spec, .. } => match op {
+            TypeOp::Is => InferredType::Boolean,
+            TypeOp::As => type_op_name(type_spec)
+                .map(type_name_to_inferred)
+                .unwrap_or(InferredType::Unknown),
+        },
+
+        Expr::Polarity { operand, .. } => infer_node(operand, annotations, index),
+
+        // Bracket index `expr[i]` — type of the receiver.
+        Expr::Indexer { receiver, .. } => infer_node(receiver, annotations, index),
+
+        // ── Invocations (chained or standalone) ──
+        Expr::Invocation { receiver, call, .. } => {
             // First, try to match this whole chain against an annotation so
             // an answer-leaf chain (e.g. `item.where(linkId='x').answer.value`)
             // resolves via the QuestionnaireIndex.
-            if let Some(t) = answer_leaf_for_chain(node, annotations, index) {
-                return t;
-            }
-            // Otherwise: examine the rightmost call.
-            let receiver = node.children.first();
-            let member = node.children.get(1);
-            match (receiver, member) {
-                (Some(recv), Some(mem)) => {
-                    if mem.node_type == "FunctionInvocation" {
-                        let name = function_name(mem).unwrap_or("");
-                        let recv_t = infer_node(recv, annotations, index);
-                        let args = function_args(mem);
-                        function_result_type(name, recv_t, &args, index, annotations)
-                    } else {
-                        // Member access on something — we can't generally know
-                        // the field type without a schema. Boolean-returning
-                        // member names are rare; default to Unknown.
-                        InferredType::Unknown
-                    }
+            if receiver.is_some() {
+                if let Some(t) = answer_leaf_for_chain(node, annotations, index) {
+                    return t;
                 }
-                _ => InferredType::Unknown,
+            }
+            match call {
+                Invocation::Function { name, args, .. } => {
+                    let recv_t = match receiver {
+                        Some(r) => infer_node(r, annotations, index),
+                        None => InferredType::Unknown,
+                    };
+                    let arg_refs: Vec<&Expr> = args.iter().collect();
+                    function_result_type(&name.raw, recv_t, &arg_refs, index, annotations)
+                }
+                // Member access on something — we can't generally know
+                // the field type without a schema. Boolean-returning
+                // member names are rare; default to Unknown.
+                Invocation::Member { .. } => InferredType::Unknown,
+                Invocation::This { .. } | Invocation::Index { .. } | Invocation::Total { .. } => {
+                    InferredType::Unknown
+                }
             }
         }
 
-        // Standalone function call: TermExpression -> InvocationTerm ->
-        // FunctionInvocation. After unwrap_passthrough we may already be at
-        // FunctionInvocation.
-        "FunctionInvocation" => {
-            let name = function_name(node).unwrap_or("");
-            let args = function_args(node);
-            function_result_type(name, InferredType::Unknown, &args, index, annotations)
-        }
+        // External constants — opaque without binding info.
+        Expr::ExternalConstant { .. } => InferredType::Unknown,
 
-        // Bracket index `expr[i]` — type of the receiver.
-        "IndexerExpression" => node
-            .children
-            .first()
-            .map(|c| infer_node(c, annotations, index))
-            .unwrap_or(InferredType::Unknown),
-
-        // Union `a | b` — same type if both operands agree, else Unknown.
-        "UnionExpression" => {
-            let left = node
-                .children
-                .first()
-                .map(|c| infer_node(c, annotations, index))
-                .unwrap_or(InferredType::Unknown);
-            let right = node
-                .children
-                .get(1)
-                .map(|c| infer_node(c, annotations, index))
-                .unwrap_or(InferredType::Unknown);
-            if left == right {
-                left
-            } else {
-                InferredType::Unknown
-            }
-        }
-
-        _ => InferredType::Unknown,
+        Expr::Parenthesized { .. } => unreachable!("stripped by unwrap_passthrough"),
     }
 }
 
@@ -478,27 +394,9 @@ fn numeric_combine(left: InferredType, right: InferredType) -> InferredType {
     }
 }
 
-/// Collect the argument expressions from a FunctionInvocation node.
-fn function_args(fi: &AstNode) -> Vec<&AstNode> {
-    let Some(functn) = fi.children.first() else {
-        return Vec::new();
-    };
-    if functn.node_type != "Functn" {
-        return Vec::new();
-    }
-    // children: [Identifier, ParamList?]
-    let Some(param_list) = functn.children.get(1) else {
-        return Vec::new();
-    };
-    if param_list.node_type != "ParamList" {
-        return Vec::new();
-    }
-    param_list.children.iter().collect()
-}
-
 /// Public entry point: infer the result type of a parsed FHIRPath expression.
 pub(crate) fn infer_result_type(
-    ast: &AstNode,
+    ast: &Expr,
     annotations: &[Annotation],
     index: &QuestionnaireIndex,
 ) -> InferredType {
@@ -561,7 +459,7 @@ fn function_cardinality(name: &str) -> Option<FnCardinality> {
 
 /// `take(n)` collapses to Singleton only when `n == 1`. Otherwise it's a
 /// pass-through cap (could keep the receiver's cardinality up to n elements).
-fn take_cardinality(args: &[&AstNode], receiver: Cardinality) -> Cardinality {
+fn take_cardinality(args: &[&Expr], receiver: Cardinality) -> Cardinality {
     let Some(arg) = args.first() else {
         return Cardinality::Unknown;
     };
@@ -574,25 +472,23 @@ fn take_cardinality(args: &[&AstNode], receiver: Cardinality) -> Cardinality {
     Cardinality::Unknown
 }
 
-/// Pull an integer value out of a literal expression, peeling wrappers.
-fn literal_integer(node: &AstNode) -> Option<i64> {
+/// Pull an integer value out of a literal expression, peeling parens.
+fn literal_integer(node: &Expr) -> Option<i64> {
     let inner = unwrap_passthrough(node);
-    if inner.node_type != "NumberLiteral" {
-        return None;
+    match inner {
+        Expr::Literal(Literal::Number { raw, .. }) => raw.parse::<i64>().ok(),
+        _ => None,
     }
-    inner
-        .terminal_node_text
-        .first()
-        .and_then(|s| s.parse::<i64>().ok())
 }
 
 fn answer_leaf_cardinality_for_chain(
-    node: &AstNode,
+    node: &Expr,
     annotations: &[Annotation],
     index: &QuestionnaireIndex,
 ) -> Option<Cardinality> {
+    let span = node.span();
     for ann in annotations {
-        if ann.span.start != node.byte_start || ann.span.end != node.byte_end {
+        if ann.span.start != span.byte_start || ann.span.end != span.byte_end {
             continue;
         }
         match ann.attribution {
@@ -624,109 +520,79 @@ fn answer_leaf_cardinality_for_chain(
 }
 
 fn infer_card_node(
-    node: &AstNode,
+    node: &Expr,
     annotations: &[Annotation],
     index: &QuestionnaireIndex,
 ) -> Cardinality {
     let node = unwrap_passthrough(node);
 
-    match node.node_type {
+    match node {
         // ── Literals: always one ──
-        "BooleanLiteral" | "StringLiteral" | "NumberLiteral" | "DateTimeLiteral"
-        | "TimeLiteral" | "QuantityLiteral" | "NullLiteral" => Cardinality::Singleton,
+        Expr::Literal(_) => Cardinality::Singleton,
 
         // External constants — `%foo` resolves to whatever is bound. Treat as
         // unknown rather than guessing.
-        "ExternalConstant" | "ExternalConstantTerm" => Cardinality::Unknown,
-
-        // Context vars: `$this`/`$index`/`$total` are scalars per spec.
-        "ThisInvocation" | "IndexInvocation" | "TotalInvocation" => Cardinality::Singleton,
+        Expr::ExternalConstant { .. } => Cardinality::Unknown,
 
         // ── Boolean and arithmetic operators all return a singleton ──
-        "EqualityExpression"
-        | "InequalityExpression"
-        | "MembershipExpression"
-        | "AndExpression"
-        | "OrExpression"
-        | "ImpliesExpression"
-        | "AdditiveExpression"
-        | "MultiplicativeExpression"
-        | "PolarityExpression" => Cardinality::Singleton,
+        Expr::Binary { op, .. } => match op {
+            // Union always Collection
+            BinOp::Union => Cardinality::Collection,
+            _ => Cardinality::Singleton,
+        },
 
-        "TypeExpression" => {
-            let op = node
-                .terminal_node_text
-                .first()
-                .map(|s| s.as_str())
-                .unwrap_or("");
-            if op == "is" {
-                Cardinality::Singleton
-            } else {
-                // `as` preserves the operand's cardinality.
-                node.children
-                    .first()
-                    .map(|c| infer_card_node(c, annotations, index))
-                    .unwrap_or(Cardinality::Unknown)
-            }
-        }
+        Expr::Type { op, lhs, .. } => match op {
+            TypeOp::Is => Cardinality::Singleton,
+            // `as` preserves the operand's cardinality.
+            TypeOp::As => infer_card_node(lhs, annotations, index),
+        },
 
-        // ── Union always Collection ──
-        "UnionExpression" => Cardinality::Collection,
+        Expr::Polarity { .. } => Cardinality::Singleton,
 
         // ── Indexer: single element ──
-        "IndexerExpression" => Cardinality::Singleton,
+        Expr::Indexer { .. } => Cardinality::Singleton,
 
-        // ── Function chains ──
-        "InvocationExpression" => {
+        // ── Invocations ──
+        Expr::Invocation { receiver, call, .. } => {
             // Answer-leaf chain: defer to questionnaire metadata.
-            if let Some(c) = answer_leaf_cardinality_for_chain(node, annotations, index) {
-                return c;
-            }
-            let receiver = node.children.first();
-            let member = node.children.get(1);
-            match (receiver, member) {
-                (Some(recv), Some(mem)) => {
-                    if mem.node_type == "FunctionInvocation" {
-                        let name = function_name(mem).unwrap_or("");
-                        let recv_card = infer_card_node(recv, annotations, index);
-                        let args = function_args(mem);
-                        function_cardinality_dispatch(
-                            name,
-                            recv_card,
-                            &args,
-                            annotations,
-                            index,
-                        )
-                    } else {
-                        // Plain member access. Without a FHIR schema we
-                        // can't know whether the field is 0..1 or 0..*.
-                        Cardinality::Unknown
-                    }
+            if receiver.is_some() {
+                if let Some(c) = answer_leaf_cardinality_for_chain(node, annotations, index) {
+                    return c;
                 }
-                _ => Cardinality::Unknown,
+            }
+            match call {
+                Invocation::Function { name, args, .. } => {
+                    let recv_card = match receiver {
+                        Some(r) => infer_card_node(r, annotations, index),
+                        None => Cardinality::Unknown,
+                    };
+                    let arg_refs: Vec<&Expr> = args.iter().collect();
+                    function_cardinality_dispatch(
+                        &name.raw,
+                        recv_card,
+                        &arg_refs,
+                        annotations,
+                        index,
+                    )
+                }
+                // Bare identifier in invocation position (e.g. `Patient`). With no
+                // schema we can't say.
+                Invocation::Member { .. } => Cardinality::Unknown,
+                // Context vars: `$this`/`$index`/`$total` are scalars per spec.
+                Invocation::This { .. } | Invocation::Index { .. } | Invocation::Total { .. } => {
+                    Cardinality::Singleton
+                }
             }
         }
 
-        // Standalone function call (after unwrap_passthrough we may already
-        // be at FunctionInvocation).
-        "FunctionInvocation" => {
-            let name = function_name(node).unwrap_or("");
-            let args = function_args(node);
-            function_cardinality_dispatch(name, Cardinality::Unknown, &args, annotations, index)
-        }
-
-        // Bare identifier in invocation position (e.g. `Patient`). With no
-        // schema we can't say.
-        "MemberInvocation" => Cardinality::Unknown,
-
-        _ => Cardinality::Unknown,
+        Expr::Parenthesized { .. } => unreachable!("stripped by unwrap_passthrough"),
     }
 }
 
 fn function_cardinality_dispatch(
     name: &str,
     receiver: Cardinality,
-    args: &[&AstNode],
+    args: &[&Expr],
     annotations: &[Annotation],
     index: &QuestionnaireIndex,
 ) -> Cardinality {
@@ -765,7 +631,7 @@ fn function_cardinality_dispatch(
 
 /// Public entry point: infer the cardinality of a parsed FHIRPath expression.
 pub(crate) fn infer_cardinality(
-    ast: &AstNode,
+    ast: &Expr,
     annotations: &[Annotation],
     index: &QuestionnaireIndex,
 ) -> Cardinality {
