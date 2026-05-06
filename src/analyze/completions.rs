@@ -43,7 +43,8 @@ enum ContextPosition {
 fn resolve_context(expr: &str) -> Result<Option<ContextPosition>, crate::ParseError> {
     let tokens = crate::lexer::tokenize(expr)?;
     let mut p = crate::parser::Parser::new(&tokens);
-    let root = p.parse_entire_expression()?;
+    let typed = p.parse_entire_expression()?;
+    let root = crate::compat::lower(&typed, &tokens);
 
     let steps = match decompose_chain(&root) {
         Some(s) => s,

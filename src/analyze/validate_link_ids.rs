@@ -1,7 +1,7 @@
 use crate::analyze::annotations::{decompose_chain, ChainStepKind};
 use crate::analyze::questionnaire_index::QuestionnaireIndex;
 use crate::analyze::{Diagnostic, DiagnosticCode, Severity, Span};
-use crate::parser::AstNode;
+use crate::compat::AstNode;
 
 /// Collect all linkIds referenced in where(linkId='...') clauses throughout the AST.
 /// Returns Vec of (linkId_value, span_of_the_literal).
@@ -54,7 +54,8 @@ pub(crate) fn validate_link_ids_from_expr(
 ) -> Result<Vec<Diagnostic>, crate::ParseError> {
     let tokens = crate::lexer::tokenize(expr)?;
     let mut parser = crate::parser::Parser::new(&tokens);
-    let root = parser.parse_entire_expression()?;
+    let typed = parser.parse_entire_expression()?;
+    let root = crate::compat::lower(&typed, &tokens);
 
     Ok(validate_link_ids_from_ast(&root, index, scope_link_id))
 }

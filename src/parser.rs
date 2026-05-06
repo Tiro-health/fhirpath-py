@@ -1,34 +1,22 @@
-/// FHIRPath recursive-descent parser: &[Token] → AstNode tree
+//! FHIRPath recursive-descent parser: `&[Token]` → typed `Expr` tree.
+//!
+//! The parser produces the typed `Expr` enum from `crate::ast`. The lowering
+//! layer in `crate::compat::lower` walks `Expr` and produces the legacy
+//! `AstNode` ANTLR-shaped tree consumed by the bindings, the analyze passes,
+//! and `resolve.rs`.
+//!
+//! Each `Expr`/`Invocation`/`Identifier`/etc. carries a `Span` covering both
+//! the byte range and the half-open token-index range `[token_start..token_end)`.
+//! The lowering layer relies on the token range to populate
+//! `AstNode::token_start/token_end`, which `compat::compute_text` uses to
+//! reconstruct the legacy `text` field.
 
+use crate::ast::{
+    BinOp, Expr, ExternalConstantId, Identifier, Invocation, Literal, QualifiedIdentifier,
+    TypeOp, TypeSpecifier, Unit, UnaryOp,
+};
 use crate::lexer::{Token, TokenKind};
 use crate::{ParseError, Span};
-
-#[derive(Debug, Clone, serde::Serialize)]
-pub struct AstNode {
-    pub node_type: &'static str,
-    pub terminal_node_text: Vec<String>,
-    pub children: Vec<AstNode>,
-    /// Index range [token_start..token_end] into the token vec (for text computation).
-    pub token_start: usize,
-    pub token_end: usize,
-    /// Byte offsets into the source string.
-    pub byte_start: usize,
-    pub byte_end: usize,
-}
-
-impl AstNode {
-    fn new(node_type: &'static str, token_start: usize, tokens: &[Token]) -> Self {
-        AstNode {
-            node_type,
-            terminal_node_text: Vec::new(),
-            children: Vec::new(),
-            token_start,
-            token_end: token_start,
-            byte_start: tokens[token_start].byte_start,
-            byte_end: tokens[token_start].byte_start,
-        }
-    }
-}
 
 pub struct Parser<'a> {
     tokens: &'a [Token],
@@ -63,32 +51,45 @@ impl<'a> Parser<'a> {
                 expected: kind,
                 found: tok.kind,
                 found_text: tok.text.clone(),
-                span: Span {
-                    byte_start: tok.byte_start,
-                    byte_end: tok.byte_end,
-                },
+                span: self.token_span(tok),
             })
         }
     }
 
-    fn set_end(&self, node: &mut AstNode) {
-        node.token_end = self.pos;
-        node.byte_end = self.tokens[self.pos.saturating_sub(1)].byte_end;
+    /// Build a `Span` covering a single token (used for error diagnostics).
+    fn token_span(&self, tok: &Token) -> Span {
+        Span {
+            byte_start: tok.byte_start,
+            byte_end: tok.byte_end,
+            token_start: 0,
+            token_end: 0,
+        }
+    }
+
+    /// Build a `Span` covering tokens `[token_start..self.pos)`. Assumes at
+    /// least one token has been consumed since `token_start`.
+    fn span_from(&self, token_start: usize) -> Span {
+        let token_end = self.pos;
+        let byte_start = self.tokens[token_start].byte_start;
+        let byte_end = self.tokens[token_end.saturating_sub(1)].byte_end;
+        Span {
+            byte_start,
+            byte_end,
+            token_start,
+            token_end,
+        }
     }
 
     // ── Entry point ─────────────────────────────────────────────────────
 
-    pub fn parse_entire_expression(&mut self) -> Result<AstNode, ParseError> {
+    pub fn parse_entire_expression(&mut self) -> Result<Expr, ParseError> {
         let expr = self.parse_expression()?;
         if self.peek() != TokenKind::Eof {
             let tok = self.current();
             return Err(ParseError::UnexpectedTokenAfterExpr {
                 found: tok.kind,
                 found_text: tok.text.clone(),
-                span: Span {
-                    byte_start: tok.byte_start,
-                    byte_end: tok.byte_end,
-                },
+                span: self.token_span(tok),
             });
         }
         Ok(expr)
@@ -96,121 +97,152 @@ impl<'a> Parser<'a> {
 
     // ── Expression precedence chain (lowest → highest) ──────────────────
 
-    fn parse_expression(&mut self) -> Result<AstNode, ParseError> {
+    fn parse_expression(&mut self) -> Result<Expr, ParseError> {
         self.parse_implies()
     }
 
-    fn parse_implies(&mut self) -> Result<AstNode, ParseError> {
-        self.parse_binary_left("ImpliesExpression", &[TokenKind::Implies], Self::parse_or)
+    fn parse_implies(&mut self) -> Result<Expr, ParseError> {
+        self.parse_binary_left(&[(TokenKind::Implies, BinOp::Implies)], Self::parse_or)
     }
 
-    fn parse_or(&mut self) -> Result<AstNode, ParseError> {
-        self.parse_binary_left("OrExpression", &[TokenKind::Or, TokenKind::Xor], Self::parse_and)
-    }
-
-    fn parse_and(&mut self) -> Result<AstNode, ParseError> {
-        self.parse_binary_left("AndExpression", &[TokenKind::And], Self::parse_membership)
-    }
-
-    fn parse_membership(&mut self) -> Result<AstNode, ParseError> {
+    fn parse_or(&mut self) -> Result<Expr, ParseError> {
         self.parse_binary_left(
-            "MembershipExpression",
-            &[TokenKind::In, TokenKind::Contains],
+            &[(TokenKind::Or, BinOp::Or), (TokenKind::Xor, BinOp::Xor)],
+            Self::parse_and,
+        )
+    }
+
+    fn parse_and(&mut self) -> Result<Expr, ParseError> {
+        self.parse_binary_left(&[(TokenKind::And, BinOp::And)], Self::parse_membership)
+    }
+
+    fn parse_membership(&mut self) -> Result<Expr, ParseError> {
+        self.parse_binary_left(
+            &[
+                (TokenKind::In, BinOp::In),
+                (TokenKind::Contains, BinOp::Contains),
+            ],
             Self::parse_equality,
         )
     }
 
-    fn parse_equality(&mut self) -> Result<AstNode, ParseError> {
+    fn parse_equality(&mut self) -> Result<Expr, ParseError> {
         self.parse_binary_left(
-            "EqualityExpression",
-            &[TokenKind::Eq, TokenKind::NotEq, TokenKind::Tilde, TokenKind::NotTilde],
+            &[
+                (TokenKind::Eq, BinOp::Eq),
+                (TokenKind::NotEq, BinOp::NotEq),
+                (TokenKind::Tilde, BinOp::EquivTilde),
+                (TokenKind::NotTilde, BinOp::NotEquivTilde),
+            ],
             Self::parse_type,
         )
     }
 
-    fn parse_type(&mut self) -> Result<AstNode, ParseError> {
-        let start = self.pos;
+    fn parse_type(&mut self) -> Result<Expr, ParseError> {
+        let token_start = self.pos;
         let mut left = self.parse_inequality()?;
         while self.peek() == TokenKind::Is || self.peek() == TokenKind::As {
-            let op_tok = self.advance().clone();
+            let op = match self.peek() {
+                TokenKind::Is => TypeOp::Is,
+                TokenKind::As => TypeOp::As,
+                _ => unreachable!(),
+            };
+            self.advance();
             let type_spec = self.parse_type_specifier()?;
-            let mut node = AstNode::new("TypeExpression", start, self.tokens);
-            node.terminal_node_text.push(op_tok.text.clone());
-            node.children.push(left);
-            node.children.push(type_spec);
-            self.set_end(&mut node);
-            left = node;
+            let span = self.span_from(token_start);
+            left = Expr::Type {
+                lhs: Box::new(left),
+                op,
+                type_spec,
+                span,
+            };
         }
         Ok(left)
     }
 
-    fn parse_inequality(&mut self) -> Result<AstNode, ParseError> {
+    fn parse_inequality(&mut self) -> Result<Expr, ParseError> {
         self.parse_binary_left(
-            "InequalityExpression",
-            &[TokenKind::Lt, TokenKind::Gt, TokenKind::LtEq, TokenKind::GtEq],
+            &[
+                (TokenKind::Lt, BinOp::Lt),
+                (TokenKind::Gt, BinOp::Gt),
+                (TokenKind::LtEq, BinOp::LtEq),
+                (TokenKind::GtEq, BinOp::GtEq),
+            ],
             Self::parse_union,
         )
     }
 
-    fn parse_union(&mut self) -> Result<AstNode, ParseError> {
-        self.parse_binary_left("UnionExpression", &[TokenKind::Pipe], Self::parse_additive)
+    fn parse_union(&mut self) -> Result<Expr, ParseError> {
+        self.parse_binary_left(&[(TokenKind::Pipe, BinOp::Union)], Self::parse_additive)
     }
 
-    fn parse_additive(&mut self) -> Result<AstNode, ParseError> {
+    fn parse_additive(&mut self) -> Result<Expr, ParseError> {
         self.parse_binary_left(
-            "AdditiveExpression",
-            &[TokenKind::Plus, TokenKind::Minus, TokenKind::Ampersand],
+            &[
+                (TokenKind::Plus, BinOp::Plus),
+                (TokenKind::Minus, BinOp::Minus),
+                (TokenKind::Ampersand, BinOp::Concat),
+            ],
             Self::parse_multiplicative,
         )
     }
 
-    fn parse_multiplicative(&mut self) -> Result<AstNode, ParseError> {
+    fn parse_multiplicative(&mut self) -> Result<Expr, ParseError> {
         self.parse_binary_left(
-            "MultiplicativeExpression",
-            &[TokenKind::Star, TokenKind::Slash, TokenKind::Div, TokenKind::Mod],
+            &[
+                (TokenKind::Star, BinOp::Mul),
+                (TokenKind::Slash, BinOp::TrueDiv),
+                (TokenKind::Div, BinOp::IntDiv),
+                (TokenKind::Mod, BinOp::Mod),
+            ],
             Self::parse_unary,
         )
     }
 
-    fn parse_unary(&mut self) -> Result<AstNode, ParseError> {
+    fn parse_unary(&mut self) -> Result<Expr, ParseError> {
         if self.peek() == TokenKind::Plus || self.peek() == TokenKind::Minus {
-            let start = self.pos;
-            let op_tok = self.advance().clone();
+            let token_start = self.pos;
+            let op = match self.peek() {
+                TokenKind::Plus => UnaryOp::Plus,
+                TokenKind::Minus => UnaryOp::Minus,
+                _ => unreachable!(),
+            };
+            self.advance();
             let operand = self.parse_unary()?;
-            let mut node = AstNode::new("PolarityExpression", start, self.tokens);
-            node.terminal_node_text.push(op_tok.text.clone());
-            node.children.push(operand);
-            self.set_end(&mut node);
-            Ok(node)
+            let span = self.span_from(token_start);
+            Ok(Expr::Polarity {
+                op,
+                operand: Box::new(operand),
+                span,
+            })
         } else {
             self.parse_postfix()
         }
     }
 
-    fn parse_postfix(&mut self) -> Result<AstNode, ParseError> {
-        let start = self.pos;
+    fn parse_postfix(&mut self) -> Result<Expr, ParseError> {
+        let token_start = self.pos;
         let mut left = self.parse_term()?;
         loop {
             if self.peek() == TokenKind::Dot {
-                let dot = self.advance().clone();
-                let inv = self.parse_invocation()?;
-                let mut node = AstNode::new("InvocationExpression", start, self.tokens);
-                node.terminal_node_text.push(dot.text.clone());
-                node.children.push(left);
-                node.children.push(inv);
-                self.set_end(&mut node);
-                left = node;
+                self.advance();
+                let call = self.parse_invocation()?;
+                let span = self.span_from(token_start);
+                left = Expr::Invocation {
+                    receiver: Some(Box::new(left)),
+                    call,
+                    span,
+                };
             } else if self.peek() == TokenKind::LBracket {
-                let lb = self.advance().clone();
-                let index_expr = self.parse_expression()?;
-                let rb = self.expect(TokenKind::RBracket)?.clone();
-                let mut node = AstNode::new("IndexerExpression", start, self.tokens);
-                node.terminal_node_text.push(lb.text.clone());
-                node.terminal_node_text.push(rb.text.clone());
-                node.children.push(left);
-                node.children.push(index_expr);
-                self.set_end(&mut node);
-                left = node;
+                self.advance();
+                let index = self.parse_expression()?;
+                self.expect(TokenKind::RBracket)?;
+                let span = self.span_from(token_start);
+                left = Expr::Indexer {
+                    receiver: Box::new(left),
+                    index: Box::new(index),
+                    span,
+                };
             } else {
                 break;
             }
@@ -218,27 +250,24 @@ impl<'a> Parser<'a> {
         Ok(left)
     }
 
-    fn parse_term(&mut self) -> Result<AstNode, ParseError> {
-        let start = self.pos;
-        let inner = self.parse_term_inner()?;
-        let mut term_expr = AstNode::new("TermExpression", start, self.tokens);
-        term_expr.children.push(inner);
-        self.set_end(&mut term_expr);
-        Ok(term_expr)
+    fn parse_term(&mut self) -> Result<Expr, ParseError> {
+        // The legacy AST wrapped every term in `TermExpression`. Lowering does
+        // that now; the parser just returns the inner Expr.
+        self.parse_term_inner()
     }
 
-    fn parse_term_inner(&mut self) -> Result<AstNode, ParseError> {
+    fn parse_term_inner(&mut self) -> Result<Expr, ParseError> {
         match self.peek() {
             TokenKind::LParen => self.parse_parenthesized_term(),
             // ANTLR error recovery treats [expr] like (expr) in term position.
             // We replicate this so expressions like `intersect([list])` work.
             TokenKind::LBracket => self.parse_bracket_term(),
             TokenKind::LBrace => self.parse_null_literal_term(),
-            TokenKind::True | TokenKind::False => self.parse_simple_literal_term("BooleanLiteral"),
-            TokenKind::String => self.parse_simple_literal_term("StringLiteral"),
+            TokenKind::True | TokenKind::False => self.parse_boolean_literal_term(),
+            TokenKind::String => self.parse_string_literal_term(),
             TokenKind::Number => self.parse_number_or_quantity_literal_term(),
-            TokenKind::DateTime => self.parse_simple_literal_term("DateTimeLiteral"),
-            TokenKind::Time => self.parse_simple_literal_term("TimeLiteral"),
+            TokenKind::DateTime => self.parse_datetime_literal_term(),
+            TokenKind::Time => self.parse_time_literal_term(),
             TokenKind::Percent => self.parse_external_constant_term(),
             TokenKind::Identifier
             | TokenKind::DelimitedIdentifier
@@ -254,10 +283,7 @@ impl<'a> Parser<'a> {
                 Err(ParseError::UnexpectedTokenInTerm {
                     found: tok.kind,
                     found_text: tok.text.clone(),
-                    span: Span {
-                        byte_start: tok.byte_start,
-                        byte_end: tok.byte_end,
-                    },
+                    span: self.token_span(tok),
                 })
             }
         }
@@ -265,23 +291,23 @@ impl<'a> Parser<'a> {
 
     // ── Term variants ───────────────────────────────────────────────────
 
-    fn parse_parenthesized_term(&mut self) -> Result<AstNode, ParseError> {
-        let start = self.pos;
-        let lp = self.advance().clone();
-        let expr = self.parse_expression()?;
-        let rp = self.expect(TokenKind::RParen)?.clone();
-        let mut node = AstNode::new("ParenthesizedTerm", start, self.tokens);
-        node.terminal_node_text.push(lp.text.clone());
-        node.terminal_node_text.push(rp.text.clone());
-        node.children.push(expr);
-        self.set_end(&mut node);
-        Ok(node)
+    fn parse_parenthesized_term(&mut self) -> Result<Expr, ParseError> {
+        let token_start = self.pos;
+        self.advance(); // (
+        let inner = self.parse_expression()?;
+        self.expect(TokenKind::RParen)?;
+        let span = self.span_from(token_start);
+        Ok(Expr::Parenthesized {
+            inner: Box::new(inner),
+            span,
+        })
     }
 
     /// Handle `[expr]` in term position — ANTLR error recovery compatibility.
-    /// The brackets are dropped (they end up in the parent's terminalNodeText in ANTLR
-    /// but that's benign). The inner expression is returned directly.
-    fn parse_bracket_term(&mut self) -> Result<AstNode, ParseError> {
+    /// The brackets are dropped (they end up in the parent's terminalNodeText
+    /// in ANTLR but that's benign). The inner expression is returned directly,
+    /// without any wrapping.
+    fn parse_bracket_term(&mut self) -> Result<Expr, ParseError> {
         self.advance(); // skip '['
         let inner = self.parse_term_inner()?;
         if self.peek() == TokenKind::RBracket {
@@ -290,61 +316,62 @@ impl<'a> Parser<'a> {
         Ok(inner)
     }
 
-    fn parse_null_literal_term(&mut self) -> Result<AstNode, ParseError> {
-        let start = self.pos;
-        let lb = self.advance().clone();
-        let rb = self.expect(TokenKind::RBrace)?.clone();
-        let mut literal = AstNode::new("NullLiteral", start, self.tokens);
-        literal.terminal_node_text.push(lb.text.clone());
-        literal.terminal_node_text.push(rb.text.clone());
-        self.set_end(&mut literal);
-        let mut term = AstNode::new("LiteralTerm", start, self.tokens);
-        term.children.push(literal);
-        self.set_end(&mut term);
-        Ok(term)
+    fn parse_null_literal_term(&mut self) -> Result<Expr, ParseError> {
+        let token_start = self.pos;
+        self.advance(); // {
+        self.expect(TokenKind::RBrace)?;
+        let span = self.span_from(token_start);
+        Ok(Expr::Literal(Literal::Null { span }))
     }
 
-    fn parse_simple_literal_term(
-        &mut self,
-        literal_kind: &'static str,
-    ) -> Result<AstNode, ParseError> {
-        let start = self.pos;
-        let tok = self.advance().clone();
-        let mut literal = AstNode::new(literal_kind, start, self.tokens);
-        literal.terminal_node_text.push(tok.text.clone());
-        self.set_end(&mut literal);
-        let mut term = AstNode::new("LiteralTerm", start, self.tokens);
-        term.children.push(literal);
-        self.set_end(&mut term);
-        Ok(term)
+    fn parse_boolean_literal_term(&mut self) -> Result<Expr, ParseError> {
+        let token_start = self.pos;
+        let value = self.peek() == TokenKind::True;
+        self.advance();
+        let span = self.span_from(token_start);
+        Ok(Expr::Literal(Literal::Boolean { value, span }))
     }
 
-    fn parse_number_or_quantity_literal_term(&mut self) -> Result<AstNode, ParseError> {
-        let start = self.pos;
-        let num_tok = self.advance().clone();
+    fn parse_string_literal_term(&mut self) -> Result<Expr, ParseError> {
+        let token_start = self.pos;
+        let raw = self.advance().text.clone();
+        let span = self.span_from(token_start);
+        Ok(Expr::Literal(Literal::String { raw, span }))
+    }
+
+    fn parse_datetime_literal_term(&mut self) -> Result<Expr, ParseError> {
+        let token_start = self.pos;
+        let raw = self.advance().text.clone();
+        let span = self.span_from(token_start);
+        Ok(Expr::Literal(Literal::DateTime { raw, span }))
+    }
+
+    fn parse_time_literal_term(&mut self) -> Result<Expr, ParseError> {
+        let token_start = self.pos;
+        let raw = self.advance().text.clone();
+        let span = self.span_from(token_start);
+        Ok(Expr::Literal(Literal::Time { raw, span }))
+    }
+
+    fn parse_number_or_quantity_literal_term(&mut self) -> Result<Expr, ParseError> {
+        let token_start = self.pos;
+        let number_text = self.advance().text.clone();
 
         // Check if next token is a unit (string literal or datetime precision word)
         if self.is_unit_start() {
-            let unit_node = self.parse_unit()?;
-            let mut quantity = AstNode::new("Quantity", start, self.tokens);
-            quantity.terminal_node_text.push(num_tok.text.clone());
-            quantity.children.push(unit_node);
-            self.set_end(&mut quantity);
-            let mut ql = AstNode::new("QuantityLiteral", start, self.tokens);
-            ql.children.push(quantity);
-            self.set_end(&mut ql);
-            let mut term = AstNode::new("LiteralTerm", start, self.tokens);
-            term.children.push(ql);
-            self.set_end(&mut term);
-            Ok(term)
+            let unit = self.parse_unit()?;
+            let span = self.span_from(token_start);
+            Ok(Expr::Literal(Literal::Quantity {
+                number: number_text,
+                unit,
+                span,
+            }))
         } else {
-            let mut literal = AstNode::new("NumberLiteral", start, self.tokens);
-            literal.terminal_node_text.push(num_tok.text.clone());
-            self.set_end(&mut literal);
-            let mut term = AstNode::new("LiteralTerm", start, self.tokens);
-            term.children.push(literal);
-            self.set_end(&mut term);
-            Ok(term)
+            let span = self.span_from(token_start);
+            Ok(Expr::Literal(Literal::Number {
+                raw: number_text,
+                span,
+            }))
         }
     }
 
@@ -359,114 +386,94 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_unit(&mut self) -> Result<AstNode, ParseError> {
-        let start = self.pos;
-        let mut unit = AstNode::new("Unit", start, self.tokens);
+    fn parse_unit(&mut self) -> Result<Unit, ParseError> {
+        let token_start = self.pos;
         match self.peek() {
             TokenKind::String => {
-                let tok = self.advance().clone();
-                unit.terminal_node_text.push(tok.text.clone());
+                let raw = self.advance().text.clone();
+                let span = self.span_from(token_start);
+                Ok(Unit::String { raw, span })
             }
             TokenKind::Identifier => {
                 let text = self.current().text.clone();
                 if is_datetime_precision(&text) {
-                    let tok = self.advance().clone();
-                    let mut dtp = AstNode::new("DateTimePrecision", start, self.tokens);
-                    dtp.terminal_node_text.push(tok.text.clone());
-                    self.set_end(&mut dtp);
-                    unit.children.push(dtp);
+                    self.advance();
+                    let span = self.span_from(token_start);
+                    Ok(Unit::DateTimePrecision { word: text, span })
                 } else if is_plural_datetime_precision(&text) {
-                    let tok = self.advance().clone();
-                    let mut pdtp = AstNode::new("PluralDateTimePrecision", start, self.tokens);
-                    pdtp.terminal_node_text.push(tok.text.clone());
-                    self.set_end(&mut pdtp);
-                    unit.children.push(pdtp);
+                    self.advance();
+                    let span = self.span_from(token_start);
+                    Ok(Unit::PluralDateTimePrecision { word: text, span })
                 } else {
                     let tok = self.current();
-                    return Err(ParseError::ExpectedUnit {
+                    Err(ParseError::ExpectedUnit {
                         found_text: Some(text),
-                        span: Span {
-                            byte_start: tok.byte_start,
-                            byte_end: tok.byte_end,
-                        },
-                    });
+                        span: self.token_span(tok),
+                    })
                 }
             }
             _ => {
                 let tok = self.current();
-                return Err(ParseError::ExpectedUnit {
+                Err(ParseError::ExpectedUnit {
                     found_text: None,
-                    span: Span {
-                        byte_start: tok.byte_start,
-                        byte_end: tok.byte_end,
-                    },
-                });
+                    span: self.token_span(tok),
+                })
             }
         }
-        self.set_end(&mut unit);
-        Ok(unit)
     }
 
-    fn parse_external_constant_term(&mut self) -> Result<AstNode, ParseError> {
-        let start = self.pos;
-        let pct = self.advance().clone();
-        // After %, expect identifier or string
-        let child = match self.peek() {
+    fn parse_external_constant_term(&mut self) -> Result<Expr, ParseError> {
+        let token_start = self.pos;
+        self.advance(); // %
+        // After %, expect identifier or string. The string-form uses the
+        // string token's span (NOT the leading %); this matches the ANTLR
+        // off-by-one where the inner Identifier's token_start sits AFTER the
+        // `%` token.
+        let ident = match self.peek() {
             TokenKind::String => {
-                let tok = self.advance().clone();
-                let mut id = AstNode::new("Identifier", start + 1, self.tokens);
-                id.terminal_node_text.push(tok.text.clone());
-                self.set_end(&mut id);
-                id
+                let str_token_start = self.pos;
+                let raw = self.advance().text.clone();
+                let span = self.span_from(str_token_start);
+                ExternalConstantId::String { raw, span }
             }
-            _ => self.parse_identifier()?,
+            _ => ExternalConstantId::Identifier(self.parse_identifier()?),
         };
-        let mut ext = AstNode::new("ExternalConstant", start, self.tokens);
-        ext.terminal_node_text.push(pct.text.clone());
-        ext.children.push(child);
-        self.set_end(&mut ext);
-        let mut term = AstNode::new("ExternalConstantTerm", start, self.tokens);
-        term.children.push(ext);
-        self.set_end(&mut term);
-        Ok(term)
+        let span = self.span_from(token_start);
+        Ok(Expr::ExternalConstant { ident, span })
     }
 
-    fn parse_invocation_term(&mut self) -> Result<AstNode, ParseError> {
-        let start = self.pos;
-        let inv = self.parse_invocation()?;
-        let mut term = AstNode::new("InvocationTerm", start, self.tokens);
-        term.children.push(inv);
-        self.set_end(&mut term);
-        Ok(term)
+    fn parse_invocation_term(&mut self) -> Result<Expr, ParseError> {
+        let token_start = self.pos;
+        let call = self.parse_invocation()?;
+        let span = self.span_from(token_start);
+        Ok(Expr::Invocation {
+            receiver: None,
+            call,
+            span,
+        })
     }
 
     // ── Invocation ──────────────────────────────────────────────────────
 
-    fn parse_invocation(&mut self) -> Result<AstNode, ParseError> {
+    fn parse_invocation(&mut self) -> Result<Invocation, ParseError> {
         match self.peek() {
             TokenKind::DollarThis => {
-                let start = self.pos;
-                let tok = self.advance().clone();
-                let mut node = AstNode::new("ThisInvocation", start, self.tokens);
-                node.terminal_node_text.push(tok.text.clone());
-                self.set_end(&mut node);
-                Ok(node)
+                let token_start = self.pos;
+                self.advance();
+                let span = self.span_from(token_start);
+                Ok(Invocation::This { span })
             }
             TokenKind::DollarIndex => {
-                let start = self.pos;
-                let tok = self.advance().clone();
-                let mut node = AstNode::new("IndexInvocation", start, self.tokens);
-                node.terminal_node_text.push(tok.text.clone());
-                self.set_end(&mut node);
-                Ok(node)
+                let token_start = self.pos;
+                self.advance();
+                let span = self.span_from(token_start);
+                Ok(Invocation::Index { span })
             }
             TokenKind::DollarTotal => {
-                let start = self.pos;
-                let tok = self.advance().clone();
-                let mut node = AstNode::new("TotalInvocation", start, self.tokens);
-                node.terminal_node_text.push(tok.text.clone());
-                self.set_end(&mut node);
-                Ok(node)
+                let token_start = self.pos;
+                self.advance();
+                let span = self.span_from(token_start);
+                Ok(Invocation::Total { span })
             }
             TokenKind::Identifier
             | TokenKind::DelimitedIdentifier
@@ -474,16 +481,12 @@ impl<'a> Parser<'a> {
             | TokenKind::Is
             | TokenKind::Contains
             | TokenKind::In => {
-                // Lookahead: identifier followed by '(' → function invocation
-                let start = self.pos;
+                let token_start = self.pos;
                 let ident = self.parse_identifier()?;
                 if self.peek() == TokenKind::LParen {
-                    self.parse_function_invocation(start, ident)
+                    self.parse_function_invocation(token_start, ident)
                 } else {
-                    let mut node = AstNode::new("MemberInvocation", start, self.tokens);
-                    node.children.push(ident);
-                    self.set_end(&mut node);
-                    Ok(node)
+                    Ok(Invocation::Member { ident })
                 }
             }
             _ => {
@@ -491,10 +494,7 @@ impl<'a> Parser<'a> {
                 Err(ParseError::ExpectedInvocation {
                     found: tok.kind,
                     found_text: tok.text.clone(),
-                    span: Span {
-                        byte_start: tok.byte_start,
-                        byte_end: tok.byte_end,
-                    },
+                    span: self.token_span(tok),
                 })
             }
         }
@@ -502,44 +502,26 @@ impl<'a> Parser<'a> {
 
     fn parse_function_invocation(
         &mut self,
-        start: usize,
-        ident: AstNode,
-    ) -> Result<AstNode, ParseError> {
-        let lp = self.advance().clone();
-        let mut functn = AstNode::new("Functn", start, self.tokens);
-        functn.terminal_node_text.push(lp.text.clone());
-        functn.children.push(ident);
+        token_start: usize,
+        name: Identifier,
+    ) -> Result<Invocation, ParseError> {
+        self.advance(); // (
+        let mut args: Vec<Expr> = Vec::new();
         if self.peek() != TokenKind::RParen {
-            let params = self.parse_param_list()?;
-            functn.children.push(params);
+            args.push(self.parse_expression()?);
+            while self.peek() == TokenKind::Comma {
+                self.advance();
+                args.push(self.parse_expression()?);
+            }
         }
-        let rp = self.expect(TokenKind::RParen)?.clone();
-        functn.terminal_node_text.push(rp.text.clone());
-        self.set_end(&mut functn);
-        let mut fi = AstNode::new("FunctionInvocation", start, self.tokens);
-        fi.children.push(functn);
-        self.set_end(&mut fi);
-        Ok(fi)
-    }
-
-    fn parse_param_list(&mut self) -> Result<AstNode, ParseError> {
-        let start = self.pos;
-        let mut pl = AstNode::new("ParamList", start, self.tokens);
-        let first = self.parse_expression()?;
-        pl.children.push(first);
-        while self.peek() == TokenKind::Comma {
-            let comma = self.advance().clone();
-            pl.terminal_node_text.push(comma.text.clone());
-            let next = self.parse_expression()?;
-            pl.children.push(next);
-        }
-        self.set_end(&mut pl);
-        Ok(pl)
+        self.expect(TokenKind::RParen)?;
+        let span = self.span_from(token_start);
+        Ok(Invocation::Function { name, args, span })
     }
 
     // ── Identifier ──────────────────────────────────────────────────────
 
-    fn parse_identifier(&mut self) -> Result<AstNode, ParseError> {
+    fn parse_identifier(&mut self) -> Result<Identifier, ParseError> {
         match self.peek() {
             TokenKind::Identifier
             | TokenKind::DelimitedIdentifier
@@ -547,22 +529,17 @@ impl<'a> Parser<'a> {
             | TokenKind::Is
             | TokenKind::Contains
             | TokenKind::In => {
-                let start = self.pos;
-                let tok = self.advance().clone();
-                let mut node = AstNode::new("Identifier", start, self.tokens);
-                node.terminal_node_text.push(tok.text.clone());
-                self.set_end(&mut node);
-                Ok(node)
+                let token_start = self.pos;
+                let raw = self.advance().text.clone();
+                let span = self.span_from(token_start);
+                Ok(Identifier { raw, span })
             }
             _ => {
                 let tok = self.current();
                 Err(ParseError::ExpectedIdentifier {
                     found: tok.kind,
                     found_text: tok.text.clone(),
-                    span: Span {
-                        byte_start: tok.byte_start,
-                        byte_end: tok.byte_end,
-                    },
+                    span: self.token_span(tok),
                 })
             }
         }
@@ -570,49 +547,48 @@ impl<'a> Parser<'a> {
 
     // ── TypeSpecifier ───────────────────────────────────────────────────
 
-    fn parse_type_specifier(&mut self) -> Result<AstNode, ParseError> {
-        let start = self.pos;
-        let qi = self.parse_qualified_identifier()?;
-        let mut ts = AstNode::new("TypeSpecifier", start, self.tokens);
-        ts.children.push(qi);
-        self.set_end(&mut ts);
-        Ok(ts)
+    fn parse_type_specifier(&mut self) -> Result<TypeSpecifier, ParseError> {
+        let token_start = self.pos;
+        let qualified = self.parse_qualified_identifier()?;
+        let span = self.span_from(token_start);
+        Ok(TypeSpecifier { qualified, span })
     }
 
-    fn parse_qualified_identifier(&mut self) -> Result<AstNode, ParseError> {
-        let start = self.pos;
-        let mut qi = AstNode::new("QualifiedIdentifier", start, self.tokens);
-        let first = self.parse_identifier()?;
-        qi.children.push(first);
+    fn parse_qualified_identifier(&mut self) -> Result<QualifiedIdentifier, ParseError> {
+        let token_start = self.pos;
+        let mut parts = Vec::new();
+        parts.push(self.parse_identifier()?);
         while self.peek() == TokenKind::Dot {
-            let dot = self.advance().clone();
-            qi.terminal_node_text.push(dot.text.clone());
-            let next = self.parse_identifier()?;
-            qi.children.push(next);
+            self.advance();
+            parts.push(self.parse_identifier()?);
         }
-        self.set_end(&mut qi);
-        Ok(qi)
+        let span = self.span_from(token_start);
+        Ok(QualifiedIdentifier { parts, span })
     }
 
     // ── DRY binary left-associative helper ──────────────────────────────
 
     fn parse_binary_left(
         &mut self,
-        node_type: &'static str,
-        ops: &[TokenKind],
-        next: fn(&mut Self) -> Result<AstNode, ParseError>,
-    ) -> Result<AstNode, ParseError> {
-        let start = self.pos;
+        ops: &[(TokenKind, BinOp)],
+        next: fn(&mut Self) -> Result<Expr, ParseError>,
+    ) -> Result<Expr, ParseError> {
+        let token_start = self.pos;
         let mut left = next(self)?;
-        while ops.contains(&self.peek()) {
-            let op_tok = self.advance().clone();
+        loop {
+            let op = match ops.iter().find(|(k, _)| *k == self.peek()) {
+                Some((_, op)) => *op,
+                None => break,
+            };
+            self.advance();
             let right = next(self)?;
-            let mut node = AstNode::new(node_type, start, self.tokens);
-            node.terminal_node_text.push(op_tok.text.clone());
-            node.children.push(left);
-            node.children.push(right);
-            self.set_end(&mut node);
-            left = node;
+            let span = self.span_from(token_start);
+            left = Expr::Binary {
+                op,
+                lhs: Box::new(left),
+                rhs: Box::new(right),
+                span,
+            };
         }
         Ok(left)
     }
@@ -631,3 +607,4 @@ fn is_plural_datetime_precision(s: &str) -> bool {
         "years" | "months" | "weeks" | "days" | "hours" | "minutes" | "seconds" | "milliseconds"
     )
 }
+
