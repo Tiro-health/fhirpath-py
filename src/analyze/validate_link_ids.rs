@@ -1,23 +1,23 @@
 use crate::analyze::annotations::{decompose_chain, ChainStepKind};
 use crate::analyze::questionnaire_index::QuestionnaireIndex;
 use crate::analyze::{Diagnostic, DiagnosticCode, Severity, Span};
-use crate::compat::AstNode;
+use crate::ast::{Expr, Invocation};
 
 /// Collect all linkIds referenced in where(linkId='...') clauses throughout the AST.
 /// Returns Vec of (linkId_value, span_of_the_literal).
-fn collect_link_id_references(node: &AstNode) -> Vec<(String, Span)> {
+fn collect_link_id_references(expr: &Expr) -> Vec<(String, Span)> {
     let mut refs = Vec::new();
-    collect_link_ids_recursive(node, &mut refs);
+    collect_link_ids_recursive(expr, &mut refs);
     refs
 }
 
-fn collect_link_ids_recursive(node: &AstNode, out: &mut Vec<(String, Span)>) {
+fn collect_link_ids_recursive(expr: &Expr, out: &mut Vec<(String, Span)>) {
     // Try to decompose this node as a chain and extract linkIds from where() steps
     if matches!(
-        node.node_type,
-        "InvocationExpression" | "TermExpression" | "IndexerExpression"
+        expr,
+        Expr::Invocation { .. } | Expr::Indexer { .. } | Expr::ExternalConstant { .. }
     ) {
-        if let Some(steps) = decompose_chain(node) {
+        if let Some(steps) = decompose_chain(expr) {
             for step in &steps {
                 if let ChainStepKind::Function {
                     name,
@@ -32,16 +32,39 @@ fn collect_link_ids_recursive(node: &AstNode, out: &mut Vec<(String, Span)>) {
                     }
                 }
             }
-            // Skip recursing into children — the chain decomposition from the outermost
-            // node already captures all linkIds, and inner InvocationExpression nodes
-            // would produce duplicates.
+            // Match legacy behavior: skip recursing into children entirely
+            // after a chain match. The chain decomposition from the outermost
+            // node already captures all top-level linkIds, and inner Invocation
+            // nodes would produce duplicates. (Side effect: linkIds buried in
+            // non-linkId where-predicates aren't validated — preserved as-is.)
             return;
         }
     }
 
-    // Recurse into children
-    for child in &node.children {
-        collect_link_ids_recursive(child, out);
+    // Recurse into structural sub-expressions (operands of Binary, etc.).
+    match expr {
+        Expr::Binary { lhs, rhs, .. } => {
+            collect_link_ids_recursive(lhs, out);
+            collect_link_ids_recursive(rhs, out);
+        }
+        Expr::Polarity { operand, .. } => collect_link_ids_recursive(operand, out),
+        Expr::Type { lhs, .. } => collect_link_ids_recursive(lhs, out),
+        Expr::Indexer { receiver, index, .. } => {
+            collect_link_ids_recursive(receiver, out);
+            collect_link_ids_recursive(index, out);
+        }
+        Expr::Invocation { receiver, call, .. } => {
+            if let Some(r) = receiver {
+                collect_link_ids_recursive(r, out);
+            }
+            if let Invocation::Function { args, .. } = call {
+                for a in args {
+                    collect_link_ids_recursive(a, out);
+                }
+            }
+        }
+        Expr::Parenthesized { inner, .. } => collect_link_ids_recursive(inner, out),
+        Expr::Literal(_) | Expr::ExternalConstant { .. } => {}
     }
 }
 
@@ -52,16 +75,12 @@ pub(crate) fn validate_link_ids_from_expr(
     index: &QuestionnaireIndex,
     scope_link_id: Option<&str>,
 ) -> Result<Vec<Diagnostic>, crate::ParseError> {
-    let tokens = crate::lexer::tokenize(expr)?;
-    let mut parser = crate::parser::Parser::new(&tokens);
-    let typed = parser.parse_entire_expression()?;
-    let root = crate::compat::lower(&typed, &tokens);
-
-    Ok(validate_link_ids_from_ast(&root, index, scope_link_id))
+    let typed = crate::parse(expr)?;
+    Ok(validate_link_ids_from_ast(&typed, index, scope_link_id))
 }
 
 fn validate_link_ids_from_ast(
-    root: &AstNode,
+    root: &Expr,
     index: &QuestionnaireIndex,
     scope_link_id: Option<&str>,
 ) -> Vec<Diagnostic> {
