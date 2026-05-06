@@ -1,0 +1,4740 @@
+{
+  "$index": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "end": 6,
+                "start": 0,
+                "terminalNodeText": [
+                  "$index"
+                ],
+                "type": "IndexInvocation"
+              }
+            ],
+            "end": 6,
+            "start": 0,
+            "terminalNodeText": [],
+            "type": "InvocationTerm"
+          }
+        ],
+        "end": 6,
+        "start": 0,
+        "terminalNodeText": [],
+        "text": "$index",
+        "type": "TermExpression"
+      }
+    ]
+  },
+  "$this": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "end": 5,
+                "start": 0,
+                "terminalNodeText": [
+                  "$this"
+                ],
+                "type": "ThisInvocation"
+              }
+            ],
+            "end": 5,
+            "start": 0,
+            "terminalNodeText": [],
+            "type": "InvocationTerm"
+          }
+        ],
+        "end": 5,
+        "start": 0,
+        "terminalNodeText": [],
+        "text": "$this",
+        "type": "TermExpression"
+      }
+    ]
+  },
+  "$total": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "end": 6,
+                "start": 0,
+                "terminalNodeText": [
+                  "$total"
+                ],
+                "type": "TotalInvocation"
+              }
+            ],
+            "end": 6,
+            "start": 0,
+            "terminalNodeText": [],
+            "type": "InvocationTerm"
+          }
+        ],
+        "end": 6,
+        "start": 0,
+        "terminalNodeText": [],
+        "text": "$total",
+        "type": "TermExpression"
+      }
+    ]
+  },
+  "%'with-dash'": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "end": 12,
+                    "start": 1,
+                    "terminalNodeText": [
+                      "'with-dash'"
+                    ],
+                    "text": "'with-dash'",
+                    "type": "Identifier"
+                  }
+                ],
+                "end": 12,
+                "start": 0,
+                "terminalNodeText": [
+                  "%"
+                ],
+                "type": "ExternalConstant"
+              }
+            ],
+            "end": 12,
+            "start": 0,
+            "terminalNodeText": [],
+            "type": "ExternalConstantTerm"
+          }
+        ],
+        "end": 12,
+        "start": 0,
+        "terminalNodeText": [],
+        "text": "%'with-dash'",
+        "type": "TermExpression"
+      }
+    ]
+  },
+  "%`with-dash`": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "end": 12,
+                    "start": 1,
+                    "terminalNodeText": [
+                      "`with-dash`"
+                    ],
+                    "text": "`with-dash`",
+                    "type": "Identifier"
+                  }
+                ],
+                "end": 12,
+                "start": 0,
+                "terminalNodeText": [
+                  "%"
+                ],
+                "type": "ExternalConstant"
+              }
+            ],
+            "end": 12,
+            "start": 0,
+            "terminalNodeText": [],
+            "type": "ExternalConstantTerm"
+          }
+        ],
+        "end": 12,
+        "start": 0,
+        "terminalNodeText": [],
+        "text": "%`with-dash`",
+        "type": "TermExpression"
+      }
+    ]
+  },
+  "%context": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "end": 8,
+                    "start": 1,
+                    "terminalNodeText": [
+                      "context"
+                    ],
+                    "text": "context",
+                    "type": "Identifier"
+                  }
+                ],
+                "end": 8,
+                "start": 0,
+                "terminalNodeText": [
+                  "%"
+                ],
+                "type": "ExternalConstant"
+              }
+            ],
+            "end": 8,
+            "start": 0,
+            "terminalNodeText": [],
+            "type": "ExternalConstantTerm"
+          }
+        ],
+        "end": 8,
+        "start": 0,
+        "terminalNodeText": [],
+        "text": "%context",
+        "type": "TermExpression"
+      }
+    ]
+  },
+  "%v + 2": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "end": 2,
+                        "start": 1,
+                        "terminalNodeText": [
+                          "v"
+                        ],
+                        "text": "v",
+                        "type": "Identifier"
+                      }
+                    ],
+                    "end": 2,
+                    "start": 0,
+                    "terminalNodeText": [
+                      "%"
+                    ],
+                    "type": "ExternalConstant"
+                  }
+                ],
+                "end": 2,
+                "start": 0,
+                "terminalNodeText": [],
+                "type": "ExternalConstantTerm"
+              }
+            ],
+            "end": 2,
+            "start": 0,
+            "terminalNodeText": [],
+            "text": "%v",
+            "type": "TermExpression"
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "end": 6,
+                    "start": 5,
+                    "terminalNodeText": [
+                      "2"
+                    ],
+                    "text": "2",
+                    "type": "NumberLiteral"
+                  }
+                ],
+                "end": 6,
+                "start": 5,
+                "terminalNodeText": [],
+                "text": "2",
+                "type": "LiteralTerm"
+              }
+            ],
+            "end": 6,
+            "start": 5,
+            "terminalNodeText": [],
+            "text": "2",
+            "type": "TermExpression"
+          }
+        ],
+        "end": 6,
+        "start": 0,
+        "terminalNodeText": [
+          "+"
+        ],
+        "type": "AdditiveExpression"
+      }
+    ]
+  },
+  "'a' & 'b'": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "end": 3,
+                    "start": 0,
+                    "terminalNodeText": [
+                      "'a'"
+                    ],
+                    "text": "'a'",
+                    "type": "StringLiteral"
+                  }
+                ],
+                "end": 3,
+                "start": 0,
+                "terminalNodeText": [],
+                "text": "'a'",
+                "type": "LiteralTerm"
+              }
+            ],
+            "end": 3,
+            "start": 0,
+            "terminalNodeText": [],
+            "text": "'a'",
+            "type": "TermExpression"
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "end": 9,
+                    "start": 6,
+                    "terminalNodeText": [
+                      "'b'"
+                    ],
+                    "text": "'b'",
+                    "type": "StringLiteral"
+                  }
+                ],
+                "end": 9,
+                "start": 6,
+                "terminalNodeText": [],
+                "text": "'b'",
+                "type": "LiteralTerm"
+              }
+            ],
+            "end": 9,
+            "start": 6,
+            "terminalNodeText": [],
+            "text": "'b'",
+            "type": "TermExpression"
+          }
+        ],
+        "end": 9,
+        "start": 0,
+        "terminalNodeText": [
+          "&"
+        ],
+        "type": "AdditiveExpression"
+      }
+    ]
+  },
+  "'hello'": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "end": 7,
+                "start": 0,
+                "terminalNodeText": [
+                  "'hello'"
+                ],
+                "text": "'hello'",
+                "type": "StringLiteral"
+              }
+            ],
+            "end": 7,
+            "start": 0,
+            "terminalNodeText": [],
+            "text": "'hello'",
+            "type": "LiteralTerm"
+          }
+        ],
+        "end": 7,
+        "start": 0,
+        "terminalNodeText": [],
+        "text": "'hello'",
+        "type": "TermExpression"
+      }
+    ]
+  },
+  "(a + b)": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "end": 2,
+                                "start": 1,
+                                "terminalNodeText": [
+                                  "a"
+                                ],
+                                "text": "a",
+                                "type": "Identifier"
+                              }
+                            ],
+                            "end": 2,
+                            "start": 1,
+                            "terminalNodeText": [],
+                            "type": "MemberInvocation"
+                          }
+                        ],
+                        "end": 2,
+                        "start": 1,
+                        "terminalNodeText": [],
+                        "type": "InvocationTerm"
+                      }
+                    ],
+                    "end": 2,
+                    "start": 1,
+                    "terminalNodeText": [],
+                    "text": "a",
+                    "type": "TermExpression"
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "end": 6,
+                                "start": 5,
+                                "terminalNodeText": [
+                                  "b"
+                                ],
+                                "text": "b",
+                                "type": "Identifier"
+                              }
+                            ],
+                            "end": 6,
+                            "start": 5,
+                            "terminalNodeText": [],
+                            "type": "MemberInvocation"
+                          }
+                        ],
+                        "end": 6,
+                        "start": 5,
+                        "terminalNodeText": [],
+                        "type": "InvocationTerm"
+                      }
+                    ],
+                    "end": 6,
+                    "start": 5,
+                    "terminalNodeText": [],
+                    "text": "b",
+                    "type": "TermExpression"
+                  }
+                ],
+                "end": 6,
+                "start": 1,
+                "terminalNodeText": [
+                  "+"
+                ],
+                "type": "AdditiveExpression"
+              }
+            ],
+            "end": 7,
+            "start": 0,
+            "terminalNodeText": [
+              "(",
+              ")"
+            ],
+            "type": "ParenthesizedTerm"
+          }
+        ],
+        "end": 7,
+        "start": 0,
+        "terminalNodeText": [],
+        "text": "(a+b)",
+        "type": "TermExpression"
+      }
+    ]
+  },
+  "(a + b).c[0].d.e()": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "children": [
+                                  {
+                                    "children": [
+                                      {
+                                        "children": [
+                                          {
+                                            "children": [
+                                              {
+                                                "end": 2,
+                                                "start": 1,
+                                                "terminalNodeText": [
+                                                  "a"
+                                                ],
+                                                "text": "a",
+                                                "type": "Identifier"
+                                              }
+                                            ],
+                                            "end": 2,
+                                            "start": 1,
+                                            "terminalNodeText": [],
+                                            "type": "MemberInvocation"
+                                          }
+                                        ],
+                                        "end": 2,
+                                        "start": 1,
+                                        "terminalNodeText": [],
+                                        "type": "InvocationTerm"
+                                      }
+                                    ],
+                                    "end": 2,
+                                    "start": 1,
+                                    "terminalNodeText": [],
+                                    "text": "a",
+                                    "type": "TermExpression"
+                                  },
+                                  {
+                                    "children": [
+                                      {
+                                        "children": [
+                                          {
+                                            "children": [
+                                              {
+                                                "end": 6,
+                                                "start": 5,
+                                                "terminalNodeText": [
+                                                  "b"
+                                                ],
+                                                "text": "b",
+                                                "type": "Identifier"
+                                              }
+                                            ],
+                                            "end": 6,
+                                            "start": 5,
+                                            "terminalNodeText": [],
+                                            "type": "MemberInvocation"
+                                          }
+                                        ],
+                                        "end": 6,
+                                        "start": 5,
+                                        "terminalNodeText": [],
+                                        "type": "InvocationTerm"
+                                      }
+                                    ],
+                                    "end": 6,
+                                    "start": 5,
+                                    "terminalNodeText": [],
+                                    "text": "b",
+                                    "type": "TermExpression"
+                                  }
+                                ],
+                                "end": 6,
+                                "start": 1,
+                                "terminalNodeText": [
+                                  "+"
+                                ],
+                                "type": "AdditiveExpression"
+                              }
+                            ],
+                            "end": 7,
+                            "start": 0,
+                            "terminalNodeText": [
+                              "(",
+                              ")"
+                            ],
+                            "type": "ParenthesizedTerm"
+                          }
+                        ],
+                        "end": 7,
+                        "start": 0,
+                        "terminalNodeText": [],
+                        "text": "(a+b)",
+                        "type": "TermExpression"
+                      },
+                      {
+                        "children": [
+                          {
+                            "end": 9,
+                            "start": 8,
+                            "terminalNodeText": [
+                              "c"
+                            ],
+                            "text": "c",
+                            "type": "Identifier"
+                          }
+                        ],
+                        "end": 9,
+                        "start": 8,
+                        "terminalNodeText": [],
+                        "type": "MemberInvocation"
+                      }
+                    ],
+                    "end": 9,
+                    "start": 0,
+                    "terminalNodeText": [
+                      "."
+                    ],
+                    "text": "(a+b).c",
+                    "type": "InvocationExpression"
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "end": 11,
+                            "start": 10,
+                            "terminalNodeText": [
+                              "0"
+                            ],
+                            "text": "0",
+                            "type": "NumberLiteral"
+                          }
+                        ],
+                        "end": 11,
+                        "start": 10,
+                        "terminalNodeText": [],
+                        "text": "0",
+                        "type": "LiteralTerm"
+                      }
+                    ],
+                    "end": 11,
+                    "start": 10,
+                    "terminalNodeText": [],
+                    "text": "0",
+                    "type": "TermExpression"
+                  }
+                ],
+                "end": 12,
+                "start": 0,
+                "terminalNodeText": [
+                  "[",
+                  "]"
+                ],
+                "type": "IndexerExpression"
+              },
+              {
+                "children": [
+                  {
+                    "end": 14,
+                    "start": 13,
+                    "terminalNodeText": [
+                      "d"
+                    ],
+                    "text": "d",
+                    "type": "Identifier"
+                  }
+                ],
+                "end": 14,
+                "start": 13,
+                "terminalNodeText": [],
+                "type": "MemberInvocation"
+              }
+            ],
+            "end": 14,
+            "start": 0,
+            "terminalNodeText": [
+              "."
+            ],
+            "text": "(a+b).c[0].d",
+            "type": "InvocationExpression"
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "end": 16,
+                    "start": 15,
+                    "terminalNodeText": [
+                      "e"
+                    ],
+                    "text": "e",
+                    "type": "Identifier"
+                  }
+                ],
+                "end": 18,
+                "start": 15,
+                "terminalNodeText": [
+                  "(",
+                  ")"
+                ],
+                "type": "Functn"
+              }
+            ],
+            "end": 18,
+            "start": 15,
+            "terminalNodeText": [],
+            "type": "FunctionInvocation"
+          }
+        ],
+        "end": 18,
+        "start": 0,
+        "terminalNodeText": [
+          "."
+        ],
+        "text": "(a+b).c[0].d.e()",
+        "type": "InvocationExpression"
+      }
+    ]
+  },
+  "+5": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "end": 2,
+                    "start": 1,
+                    "terminalNodeText": [
+                      "5"
+                    ],
+                    "text": "5",
+                    "type": "NumberLiteral"
+                  }
+                ],
+                "end": 2,
+                "start": 1,
+                "terminalNodeText": [],
+                "text": "5",
+                "type": "LiteralTerm"
+              }
+            ],
+            "end": 2,
+            "start": 1,
+            "terminalNodeText": [],
+            "text": "5",
+            "type": "TermExpression"
+          }
+        ],
+        "end": 2,
+        "start": 0,
+        "terminalNodeText": [
+          "+"
+        ],
+        "type": "PolarityExpression"
+      }
+    ]
+  },
+  "--+x": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "end": 4,
+                                "start": 3,
+                                "terminalNodeText": [
+                                  "x"
+                                ],
+                                "text": "x",
+                                "type": "Identifier"
+                              }
+                            ],
+                            "end": 4,
+                            "start": 3,
+                            "terminalNodeText": [],
+                            "type": "MemberInvocation"
+                          }
+                        ],
+                        "end": 4,
+                        "start": 3,
+                        "terminalNodeText": [],
+                        "type": "InvocationTerm"
+                      }
+                    ],
+                    "end": 4,
+                    "start": 3,
+                    "terminalNodeText": [],
+                    "text": "x",
+                    "type": "TermExpression"
+                  }
+                ],
+                "end": 4,
+                "start": 2,
+                "terminalNodeText": [
+                  "+"
+                ],
+                "type": "PolarityExpression"
+              }
+            ],
+            "end": 4,
+            "start": 1,
+            "terminalNodeText": [
+              "-"
+            ],
+            "type": "PolarityExpression"
+          }
+        ],
+        "end": 4,
+        "start": 0,
+        "terminalNodeText": [
+          "-"
+        ],
+        "type": "PolarityExpression"
+      }
+    ]
+  },
+  "-x": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "end": 2,
+                        "start": 1,
+                        "terminalNodeText": [
+                          "x"
+                        ],
+                        "text": "x",
+                        "type": "Identifier"
+                      }
+                    ],
+                    "end": 2,
+                    "start": 1,
+                    "terminalNodeText": [],
+                    "type": "MemberInvocation"
+                  }
+                ],
+                "end": 2,
+                "start": 1,
+                "terminalNodeText": [],
+                "type": "InvocationTerm"
+              }
+            ],
+            "end": 2,
+            "start": 1,
+            "terminalNodeText": [],
+            "text": "x",
+            "type": "TermExpression"
+          }
+        ],
+        "end": 2,
+        "start": 0,
+        "terminalNodeText": [
+          "-"
+        ],
+        "type": "PolarityExpression"
+      }
+    ]
+  },
+  "1 is FHIR.boolean": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "end": 1,
+                    "start": 0,
+                    "terminalNodeText": [
+                      "1"
+                    ],
+                    "text": "1",
+                    "type": "NumberLiteral"
+                  }
+                ],
+                "end": 1,
+                "start": 0,
+                "terminalNodeText": [],
+                "text": "1",
+                "type": "LiteralTerm"
+              }
+            ],
+            "end": 1,
+            "start": 0,
+            "terminalNodeText": [],
+            "text": "1",
+            "type": "TermExpression"
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "end": 9,
+                    "start": 5,
+                    "terminalNodeText": [
+                      "FHIR"
+                    ],
+                    "text": "FHIR",
+                    "type": "Identifier"
+                  },
+                  {
+                    "end": 17,
+                    "start": 10,
+                    "terminalNodeText": [
+                      "boolean"
+                    ],
+                    "text": "boolean",
+                    "type": "Identifier"
+                  }
+                ],
+                "end": 17,
+                "start": 5,
+                "terminalNodeText": [
+                  "."
+                ],
+                "type": "QualifiedIdentifier"
+              }
+            ],
+            "end": 17,
+            "start": 5,
+            "terminalNodeText": [],
+            "text": "FHIR.boolean",
+            "type": "TypeSpecifier"
+          }
+        ],
+        "end": 17,
+        "start": 0,
+        "terminalNodeText": [
+          "is"
+        ],
+        "type": "TypeExpression"
+      }
+    ]
+  },
+  "1 year": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "end": 6,
+                            "start": 2,
+                            "terminalNodeText": [
+                              "year"
+                            ],
+                            "type": "DateTimePrecision"
+                          }
+                        ],
+                        "end": 6,
+                        "start": 2,
+                        "terminalNodeText": [],
+                        "type": "Unit"
+                      }
+                    ],
+                    "end": 6,
+                    "start": 0,
+                    "terminalNodeText": [
+                      "1"
+                    ],
+                    "type": "Quantity"
+                  }
+                ],
+                "end": 6,
+                "start": 0,
+                "terminalNodeText": [],
+                "text": "1year",
+                "type": "QuantityLiteral"
+              }
+            ],
+            "end": 6,
+            "start": 0,
+            "terminalNodeText": [],
+            "text": "1year",
+            "type": "LiteralTerm"
+          }
+        ],
+        "end": 6,
+        "start": 0,
+        "terminalNodeText": [],
+        "text": "1year",
+        "type": "TermExpression"
+      }
+    ]
+  },
+  "2 years": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "end": 7,
+                            "start": 2,
+                            "terminalNodeText": [
+                              "years"
+                            ],
+                            "type": "PluralDateTimePrecision"
+                          }
+                        ],
+                        "end": 7,
+                        "start": 2,
+                        "terminalNodeText": [],
+                        "type": "Unit"
+                      }
+                    ],
+                    "end": 7,
+                    "start": 0,
+                    "terminalNodeText": [
+                      "2"
+                    ],
+                    "type": "Quantity"
+                  }
+                ],
+                "end": 7,
+                "start": 0,
+                "terminalNodeText": [],
+                "text": "2years",
+                "type": "QuantityLiteral"
+              }
+            ],
+            "end": 7,
+            "start": 0,
+            "terminalNodeText": [],
+            "text": "2years",
+            "type": "LiteralTerm"
+          }
+        ],
+        "end": 7,
+        "start": 0,
+        "terminalNodeText": [],
+        "text": "2years",
+        "type": "TermExpression"
+      }
+    ]
+  },
+  "3.14": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "end": 4,
+                "start": 0,
+                "terminalNodeText": [
+                  "3.14"
+                ],
+                "text": "3.14",
+                "type": "NumberLiteral"
+              }
+            ],
+            "end": 4,
+            "start": 0,
+            "terminalNodeText": [],
+            "text": "3.14",
+            "type": "LiteralTerm"
+          }
+        ],
+        "end": 4,
+        "start": 0,
+        "terminalNodeText": [],
+        "text": "3.14",
+        "type": "TermExpression"
+      }
+    ]
+  },
+  "42": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "end": 2,
+                "start": 0,
+                "terminalNodeText": [
+                  "42"
+                ],
+                "text": "42",
+                "type": "NumberLiteral"
+              }
+            ],
+            "end": 2,
+            "start": 0,
+            "terminalNodeText": [],
+            "text": "42",
+            "type": "LiteralTerm"
+          }
+        ],
+        "end": 2,
+        "start": 0,
+        "terminalNodeText": [],
+        "text": "42",
+        "type": "TermExpression"
+      }
+    ]
+  },
+  "5 'mg'": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "end": 6,
+                        "start": 2,
+                        "terminalNodeText": [
+                          "'mg'"
+                        ],
+                        "type": "Unit"
+                      }
+                    ],
+                    "end": 6,
+                    "start": 0,
+                    "terminalNodeText": [
+                      "5"
+                    ],
+                    "type": "Quantity"
+                  }
+                ],
+                "end": 6,
+                "start": 0,
+                "terminalNodeText": [],
+                "text": "5'mg'",
+                "type": "QuantityLiteral"
+              }
+            ],
+            "end": 6,
+            "start": 0,
+            "terminalNodeText": [],
+            "text": "5'mg'",
+            "type": "LiteralTerm"
+          }
+        ],
+        "end": 6,
+        "start": 0,
+        "terminalNodeText": [],
+        "text": "5'mg'",
+        "type": "TermExpression"
+      }
+    ]
+  },
+  "@2024-01-15T10:30:00": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "end": 20,
+                "start": 0,
+                "terminalNodeText": [
+                  "@2024-01-15T10:30:00"
+                ],
+                "text": "@2024-01-15T10:30:00",
+                "type": "DateTimeLiteral"
+              }
+            ],
+            "end": 20,
+            "start": 0,
+            "terminalNodeText": [],
+            "text": "@2024-01-15T10:30:00",
+            "type": "LiteralTerm"
+          }
+        ],
+        "end": 20,
+        "start": 0,
+        "terminalNodeText": [],
+        "text": "@2024-01-15T10:30:00",
+        "type": "TermExpression"
+      }
+    ]
+  },
+  "@T14:30": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "end": 7,
+                "start": 0,
+                "terminalNodeText": [
+                  "@T14:30"
+                ],
+                "text": "@T14:30",
+                "type": "TimeLiteral"
+              }
+            ],
+            "end": 7,
+            "start": 0,
+            "terminalNodeText": [],
+            "text": "@T14:30",
+            "type": "LiteralTerm"
+          }
+        ],
+        "end": 7,
+        "start": 0,
+        "terminalNodeText": [],
+        "text": "@T14:30",
+        "type": "TermExpression"
+      }
+    ]
+  },
+  "Observation.value": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "end": 11,
+                        "start": 0,
+                        "terminalNodeText": [
+                          "Observation"
+                        ],
+                        "text": "Observation",
+                        "type": "Identifier"
+                      }
+                    ],
+                    "end": 11,
+                    "start": 0,
+                    "terminalNodeText": [],
+                    "type": "MemberInvocation"
+                  }
+                ],
+                "end": 11,
+                "start": 0,
+                "terminalNodeText": [],
+                "type": "InvocationTerm"
+              }
+            ],
+            "end": 11,
+            "start": 0,
+            "terminalNodeText": [],
+            "text": "Observation",
+            "type": "TermExpression"
+          },
+          {
+            "children": [
+              {
+                "end": 17,
+                "start": 12,
+                "terminalNodeText": [
+                  "value"
+                ],
+                "text": "value",
+                "type": "Identifier"
+              }
+            ],
+            "end": 17,
+            "start": 12,
+            "terminalNodeText": [],
+            "type": "MemberInvocation"
+          }
+        ],
+        "end": 17,
+        "start": 0,
+        "terminalNodeText": [
+          "."
+        ],
+        "text": "Observation.value",
+        "type": "InvocationExpression"
+      }
+    ]
+  },
+  "Patient": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "end": 7,
+                    "start": 0,
+                    "terminalNodeText": [
+                      "Patient"
+                    ],
+                    "text": "Patient",
+                    "type": "Identifier"
+                  }
+                ],
+                "end": 7,
+                "start": 0,
+                "terminalNodeText": [],
+                "type": "MemberInvocation"
+              }
+            ],
+            "end": 7,
+            "start": 0,
+            "terminalNodeText": [],
+            "type": "InvocationTerm"
+          }
+        ],
+        "end": 7,
+        "start": 0,
+        "terminalNodeText": [],
+        "text": "Patient",
+        "type": "TermExpression"
+      }
+    ]
+  },
+  "Patient.as": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "end": 7,
+                        "start": 0,
+                        "terminalNodeText": [
+                          "Patient"
+                        ],
+                        "text": "Patient",
+                        "type": "Identifier"
+                      }
+                    ],
+                    "end": 7,
+                    "start": 0,
+                    "terminalNodeText": [],
+                    "type": "MemberInvocation"
+                  }
+                ],
+                "end": 7,
+                "start": 0,
+                "terminalNodeText": [],
+                "type": "InvocationTerm"
+              }
+            ],
+            "end": 7,
+            "start": 0,
+            "terminalNodeText": [],
+            "text": "Patient",
+            "type": "TermExpression"
+          },
+          {
+            "children": [
+              {
+                "end": 10,
+                "start": 8,
+                "terminalNodeText": [
+                  "as"
+                ],
+                "text": "as",
+                "type": "Identifier"
+              }
+            ],
+            "end": 10,
+            "start": 8,
+            "terminalNodeText": [],
+            "type": "MemberInvocation"
+          }
+        ],
+        "end": 10,
+        "start": 0,
+        "terminalNodeText": [
+          "."
+        ],
+        "text": "Patient.as",
+        "type": "InvocationExpression"
+      }
+    ]
+  },
+  "Patient.contains": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "end": 7,
+                        "start": 0,
+                        "terminalNodeText": [
+                          "Patient"
+                        ],
+                        "text": "Patient",
+                        "type": "Identifier"
+                      }
+                    ],
+                    "end": 7,
+                    "start": 0,
+                    "terminalNodeText": [],
+                    "type": "MemberInvocation"
+                  }
+                ],
+                "end": 7,
+                "start": 0,
+                "terminalNodeText": [],
+                "type": "InvocationTerm"
+              }
+            ],
+            "end": 7,
+            "start": 0,
+            "terminalNodeText": [],
+            "text": "Patient",
+            "type": "TermExpression"
+          },
+          {
+            "children": [
+              {
+                "end": 16,
+                "start": 8,
+                "terminalNodeText": [
+                  "contains"
+                ],
+                "text": "contains",
+                "type": "Identifier"
+              }
+            ],
+            "end": 16,
+            "start": 8,
+            "terminalNodeText": [],
+            "type": "MemberInvocation"
+          }
+        ],
+        "end": 16,
+        "start": 0,
+        "terminalNodeText": [
+          "."
+        ],
+        "text": "Patient.contains",
+        "type": "InvocationExpression"
+      }
+    ]
+  },
+  "Patient.in": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "end": 7,
+                        "start": 0,
+                        "terminalNodeText": [
+                          "Patient"
+                        ],
+                        "text": "Patient",
+                        "type": "Identifier"
+                      }
+                    ],
+                    "end": 7,
+                    "start": 0,
+                    "terminalNodeText": [],
+                    "type": "MemberInvocation"
+                  }
+                ],
+                "end": 7,
+                "start": 0,
+                "terminalNodeText": [],
+                "type": "InvocationTerm"
+              }
+            ],
+            "end": 7,
+            "start": 0,
+            "terminalNodeText": [],
+            "text": "Patient",
+            "type": "TermExpression"
+          },
+          {
+            "children": [
+              {
+                "end": 10,
+                "start": 8,
+                "terminalNodeText": [
+                  "in"
+                ],
+                "text": "in",
+                "type": "Identifier"
+              }
+            ],
+            "end": 10,
+            "start": 8,
+            "terminalNodeText": [],
+            "type": "MemberInvocation"
+          }
+        ],
+        "end": 10,
+        "start": 0,
+        "terminalNodeText": [
+          "."
+        ],
+        "text": "Patient.in",
+        "type": "InvocationExpression"
+      }
+    ]
+  },
+  "Patient.is": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "end": 7,
+                        "start": 0,
+                        "terminalNodeText": [
+                          "Patient"
+                        ],
+                        "text": "Patient",
+                        "type": "Identifier"
+                      }
+                    ],
+                    "end": 7,
+                    "start": 0,
+                    "terminalNodeText": [],
+                    "type": "MemberInvocation"
+                  }
+                ],
+                "end": 7,
+                "start": 0,
+                "terminalNodeText": [],
+                "type": "InvocationTerm"
+              }
+            ],
+            "end": 7,
+            "start": 0,
+            "terminalNodeText": [],
+            "text": "Patient",
+            "type": "TermExpression"
+          },
+          {
+            "children": [
+              {
+                "end": 10,
+                "start": 8,
+                "terminalNodeText": [
+                  "is"
+                ],
+                "text": "is",
+                "type": "Identifier"
+              }
+            ],
+            "end": 10,
+            "start": 8,
+            "terminalNodeText": [],
+            "type": "MemberInvocation"
+          }
+        ],
+        "end": 10,
+        "start": 0,
+        "terminalNodeText": [
+          "."
+        ],
+        "text": "Patient.is",
+        "type": "InvocationExpression"
+      }
+    ]
+  },
+  "Patient.name.given": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "end": 7,
+                            "start": 0,
+                            "terminalNodeText": [
+                              "Patient"
+                            ],
+                            "text": "Patient",
+                            "type": "Identifier"
+                          }
+                        ],
+                        "end": 7,
+                        "start": 0,
+                        "terminalNodeText": [],
+                        "type": "MemberInvocation"
+                      }
+                    ],
+                    "end": 7,
+                    "start": 0,
+                    "terminalNodeText": [],
+                    "type": "InvocationTerm"
+                  }
+                ],
+                "end": 7,
+                "start": 0,
+                "terminalNodeText": [],
+                "text": "Patient",
+                "type": "TermExpression"
+              },
+              {
+                "children": [
+                  {
+                    "end": 12,
+                    "start": 8,
+                    "terminalNodeText": [
+                      "name"
+                    ],
+                    "text": "name",
+                    "type": "Identifier"
+                  }
+                ],
+                "end": 12,
+                "start": 8,
+                "terminalNodeText": [],
+                "type": "MemberInvocation"
+              }
+            ],
+            "end": 12,
+            "start": 0,
+            "terminalNodeText": [
+              "."
+            ],
+            "text": "Patient.name",
+            "type": "InvocationExpression"
+          },
+          {
+            "children": [
+              {
+                "end": 18,
+                "start": 13,
+                "terminalNodeText": [
+                  "given"
+                ],
+                "text": "given",
+                "type": "Identifier"
+              }
+            ],
+            "end": 18,
+            "start": 13,
+            "terminalNodeText": [],
+            "type": "MemberInvocation"
+          }
+        ],
+        "end": 18,
+        "start": 0,
+        "terminalNodeText": [
+          "."
+        ],
+        "text": "Patient.name.given",
+        "type": "InvocationExpression"
+      }
+    ]
+  },
+  "Patient.name.where(use = 'official').given.first()": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "children": [
+                                  {
+                                    "end": 7,
+                                    "start": 0,
+                                    "terminalNodeText": [
+                                      "Patient"
+                                    ],
+                                    "text": "Patient",
+                                    "type": "Identifier"
+                                  }
+                                ],
+                                "end": 7,
+                                "start": 0,
+                                "terminalNodeText": [],
+                                "type": "MemberInvocation"
+                              }
+                            ],
+                            "end": 7,
+                            "start": 0,
+                            "terminalNodeText": [],
+                            "type": "InvocationTerm"
+                          }
+                        ],
+                        "end": 7,
+                        "start": 0,
+                        "terminalNodeText": [],
+                        "text": "Patient",
+                        "type": "TermExpression"
+                      },
+                      {
+                        "children": [
+                          {
+                            "end": 12,
+                            "start": 8,
+                            "terminalNodeText": [
+                              "name"
+                            ],
+                            "text": "name",
+                            "type": "Identifier"
+                          }
+                        ],
+                        "end": 12,
+                        "start": 8,
+                        "terminalNodeText": [],
+                        "type": "MemberInvocation"
+                      }
+                    ],
+                    "end": 12,
+                    "start": 0,
+                    "terminalNodeText": [
+                      "."
+                    ],
+                    "text": "Patient.name",
+                    "type": "InvocationExpression"
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "end": 18,
+                            "start": 13,
+                            "terminalNodeText": [
+                              "where"
+                            ],
+                            "text": "where",
+                            "type": "Identifier"
+                          },
+                          {
+                            "children": [
+                              {
+                                "children": [
+                                  {
+                                    "children": [
+                                      {
+                                        "children": [
+                                          {
+                                            "children": [
+                                              {
+                                                "end": 22,
+                                                "start": 19,
+                                                "terminalNodeText": [
+                                                  "use"
+                                                ],
+                                                "text": "use",
+                                                "type": "Identifier"
+                                              }
+                                            ],
+                                            "end": 22,
+                                            "start": 19,
+                                            "terminalNodeText": [],
+                                            "type": "MemberInvocation"
+                                          }
+                                        ],
+                                        "end": 22,
+                                        "start": 19,
+                                        "terminalNodeText": [],
+                                        "type": "InvocationTerm"
+                                      }
+                                    ],
+                                    "end": 22,
+                                    "start": 19,
+                                    "terminalNodeText": [],
+                                    "text": "use",
+                                    "type": "TermExpression"
+                                  },
+                                  {
+                                    "children": [
+                                      {
+                                        "children": [
+                                          {
+                                            "end": 35,
+                                            "start": 25,
+                                            "terminalNodeText": [
+                                              "'official'"
+                                            ],
+                                            "text": "'official'",
+                                            "type": "StringLiteral"
+                                          }
+                                        ],
+                                        "end": 35,
+                                        "start": 25,
+                                        "terminalNodeText": [],
+                                        "text": "'official'",
+                                        "type": "LiteralTerm"
+                                      }
+                                    ],
+                                    "end": 35,
+                                    "start": 25,
+                                    "terminalNodeText": [],
+                                    "text": "'official'",
+                                    "type": "TermExpression"
+                                  }
+                                ],
+                                "end": 35,
+                                "start": 19,
+                                "terminalNodeText": [
+                                  "="
+                                ],
+                                "type": "EqualityExpression"
+                              }
+                            ],
+                            "end": 35,
+                            "start": 19,
+                            "terminalNodeText": [],
+                            "type": "ParamList"
+                          }
+                        ],
+                        "end": 36,
+                        "start": 13,
+                        "terminalNodeText": [
+                          "(",
+                          ")"
+                        ],
+                        "type": "Functn"
+                      }
+                    ],
+                    "end": 36,
+                    "start": 13,
+                    "terminalNodeText": [],
+                    "type": "FunctionInvocation"
+                  }
+                ],
+                "end": 36,
+                "start": 0,
+                "terminalNodeText": [
+                  "."
+                ],
+                "text": "Patient.name.where(use='official')",
+                "type": "InvocationExpression"
+              },
+              {
+                "children": [
+                  {
+                    "end": 42,
+                    "start": 37,
+                    "terminalNodeText": [
+                      "given"
+                    ],
+                    "text": "given",
+                    "type": "Identifier"
+                  }
+                ],
+                "end": 42,
+                "start": 37,
+                "terminalNodeText": [],
+                "type": "MemberInvocation"
+              }
+            ],
+            "end": 42,
+            "start": 0,
+            "terminalNodeText": [
+              "."
+            ],
+            "text": "Patient.name.where(use='official').given",
+            "type": "InvocationExpression"
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "end": 48,
+                    "start": 43,
+                    "terminalNodeText": [
+                      "first"
+                    ],
+                    "text": "first",
+                    "type": "Identifier"
+                  }
+                ],
+                "end": 50,
+                "start": 43,
+                "terminalNodeText": [
+                  "(",
+                  ")"
+                ],
+                "type": "Functn"
+              }
+            ],
+            "end": 50,
+            "start": 43,
+            "terminalNodeText": [],
+            "type": "FunctionInvocation"
+          }
+        ],
+        "end": 50,
+        "start": 0,
+        "terminalNodeText": [
+          "."
+        ],
+        "text": "Patient.name.where(use='official').given.first()",
+        "type": "InvocationExpression"
+      }
+    ]
+  },
+  "`delimited`": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "end": 11,
+                    "start": 0,
+                    "terminalNodeText": [
+                      "`delimited`"
+                    ],
+                    "text": "`delimited`",
+                    "type": "Identifier"
+                  }
+                ],
+                "end": 11,
+                "start": 0,
+                "terminalNodeText": [],
+                "type": "MemberInvocation"
+              }
+            ],
+            "end": 11,
+            "start": 0,
+            "terminalNodeText": [],
+            "type": "InvocationTerm"
+          }
+        ],
+        "end": 11,
+        "start": 0,
+        "terminalNodeText": [],
+        "text": "`delimited`",
+        "type": "TermExpression"
+      }
+    ]
+  },
+  "a != b": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "end": 1,
+                        "start": 0,
+                        "terminalNodeText": [
+                          "a"
+                        ],
+                        "text": "a",
+                        "type": "Identifier"
+                      }
+                    ],
+                    "end": 1,
+                    "start": 0,
+                    "terminalNodeText": [],
+                    "type": "MemberInvocation"
+                  }
+                ],
+                "end": 1,
+                "start": 0,
+                "terminalNodeText": [],
+                "type": "InvocationTerm"
+              }
+            ],
+            "end": 1,
+            "start": 0,
+            "terminalNodeText": [],
+            "text": "a",
+            "type": "TermExpression"
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "end": 6,
+                        "start": 5,
+                        "terminalNodeText": [
+                          "b"
+                        ],
+                        "text": "b",
+                        "type": "Identifier"
+                      }
+                    ],
+                    "end": 6,
+                    "start": 5,
+                    "terminalNodeText": [],
+                    "type": "MemberInvocation"
+                  }
+                ],
+                "end": 6,
+                "start": 5,
+                "terminalNodeText": [],
+                "type": "InvocationTerm"
+              }
+            ],
+            "end": 6,
+            "start": 5,
+            "terminalNodeText": [],
+            "text": "b",
+            "type": "TermExpression"
+          }
+        ],
+        "end": 6,
+        "start": 0,
+        "terminalNodeText": [
+          "!="
+        ],
+        "type": "EqualityExpression"
+      }
+    ]
+  },
+  "a !~ b": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "end": 1,
+                        "start": 0,
+                        "terminalNodeText": [
+                          "a"
+                        ],
+                        "text": "a",
+                        "type": "Identifier"
+                      }
+                    ],
+                    "end": 1,
+                    "start": 0,
+                    "terminalNodeText": [],
+                    "type": "MemberInvocation"
+                  }
+                ],
+                "end": 1,
+                "start": 0,
+                "terminalNodeText": [],
+                "type": "InvocationTerm"
+              }
+            ],
+            "end": 1,
+            "start": 0,
+            "terminalNodeText": [],
+            "text": "a",
+            "type": "TermExpression"
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "end": 6,
+                        "start": 5,
+                        "terminalNodeText": [
+                          "b"
+                        ],
+                        "text": "b",
+                        "type": "Identifier"
+                      }
+                    ],
+                    "end": 6,
+                    "start": 5,
+                    "terminalNodeText": [],
+                    "type": "MemberInvocation"
+                  }
+                ],
+                "end": 6,
+                "start": 5,
+                "terminalNodeText": [],
+                "type": "InvocationTerm"
+              }
+            ],
+            "end": 6,
+            "start": 5,
+            "terminalNodeText": [],
+            "text": "b",
+            "type": "TermExpression"
+          }
+        ],
+        "end": 6,
+        "start": 0,
+        "terminalNodeText": [
+          "!~"
+        ],
+        "type": "EqualityExpression"
+      }
+    ]
+  },
+  "a * b": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "end": 1,
+                        "start": 0,
+                        "terminalNodeText": [
+                          "a"
+                        ],
+                        "text": "a",
+                        "type": "Identifier"
+                      }
+                    ],
+                    "end": 1,
+                    "start": 0,
+                    "terminalNodeText": [],
+                    "type": "MemberInvocation"
+                  }
+                ],
+                "end": 1,
+                "start": 0,
+                "terminalNodeText": [],
+                "type": "InvocationTerm"
+              }
+            ],
+            "end": 1,
+            "start": 0,
+            "terminalNodeText": [],
+            "text": "a",
+            "type": "TermExpression"
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "end": 5,
+                        "start": 4,
+                        "terminalNodeText": [
+                          "b"
+                        ],
+                        "text": "b",
+                        "type": "Identifier"
+                      }
+                    ],
+                    "end": 5,
+                    "start": 4,
+                    "terminalNodeText": [],
+                    "type": "MemberInvocation"
+                  }
+                ],
+                "end": 5,
+                "start": 4,
+                "terminalNodeText": [],
+                "type": "InvocationTerm"
+              }
+            ],
+            "end": 5,
+            "start": 4,
+            "terminalNodeText": [],
+            "text": "b",
+            "type": "TermExpression"
+          }
+        ],
+        "end": 5,
+        "start": 0,
+        "terminalNodeText": [
+          "*"
+        ],
+        "type": "MultiplicativeExpression"
+      }
+    ]
+  },
+  "a + b": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "end": 1,
+                        "start": 0,
+                        "terminalNodeText": [
+                          "a"
+                        ],
+                        "text": "a",
+                        "type": "Identifier"
+                      }
+                    ],
+                    "end": 1,
+                    "start": 0,
+                    "terminalNodeText": [],
+                    "type": "MemberInvocation"
+                  }
+                ],
+                "end": 1,
+                "start": 0,
+                "terminalNodeText": [],
+                "type": "InvocationTerm"
+              }
+            ],
+            "end": 1,
+            "start": 0,
+            "terminalNodeText": [],
+            "text": "a",
+            "type": "TermExpression"
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "end": 5,
+                        "start": 4,
+                        "terminalNodeText": [
+                          "b"
+                        ],
+                        "text": "b",
+                        "type": "Identifier"
+                      }
+                    ],
+                    "end": 5,
+                    "start": 4,
+                    "terminalNodeText": [],
+                    "type": "MemberInvocation"
+                  }
+                ],
+                "end": 5,
+                "start": 4,
+                "terminalNodeText": [],
+                "type": "InvocationTerm"
+              }
+            ],
+            "end": 5,
+            "start": 4,
+            "terminalNodeText": [],
+            "text": "b",
+            "type": "TermExpression"
+          }
+        ],
+        "end": 5,
+        "start": 0,
+        "terminalNodeText": [
+          "+"
+        ],
+        "type": "AdditiveExpression"
+      }
+    ]
+  },
+  "a - b": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "end": 1,
+                        "start": 0,
+                        "terminalNodeText": [
+                          "a"
+                        ],
+                        "text": "a",
+                        "type": "Identifier"
+                      }
+                    ],
+                    "end": 1,
+                    "start": 0,
+                    "terminalNodeText": [],
+                    "type": "MemberInvocation"
+                  }
+                ],
+                "end": 1,
+                "start": 0,
+                "terminalNodeText": [],
+                "type": "InvocationTerm"
+              }
+            ],
+            "end": 1,
+            "start": 0,
+            "terminalNodeText": [],
+            "text": "a",
+            "type": "TermExpression"
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "end": 5,
+                        "start": 4,
+                        "terminalNodeText": [
+                          "b"
+                        ],
+                        "text": "b",
+                        "type": "Identifier"
+                      }
+                    ],
+                    "end": 5,
+                    "start": 4,
+                    "terminalNodeText": [],
+                    "type": "MemberInvocation"
+                  }
+                ],
+                "end": 5,
+                "start": 4,
+                "terminalNodeText": [],
+                "type": "InvocationTerm"
+              }
+            ],
+            "end": 5,
+            "start": 4,
+            "terminalNodeText": [],
+            "text": "b",
+            "type": "TermExpression"
+          }
+        ],
+        "end": 5,
+        "start": 0,
+        "terminalNodeText": [
+          "-"
+        ],
+        "type": "AdditiveExpression"
+      }
+    ]
+  },
+  "a / b": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "end": 1,
+                        "start": 0,
+                        "terminalNodeText": [
+                          "a"
+                        ],
+                        "text": "a",
+                        "type": "Identifier"
+                      }
+                    ],
+                    "end": 1,
+                    "start": 0,
+                    "terminalNodeText": [],
+                    "type": "MemberInvocation"
+                  }
+                ],
+                "end": 1,
+                "start": 0,
+                "terminalNodeText": [],
+                "type": "InvocationTerm"
+              }
+            ],
+            "end": 1,
+            "start": 0,
+            "terminalNodeText": [],
+            "text": "a",
+            "type": "TermExpression"
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "end": 5,
+                        "start": 4,
+                        "terminalNodeText": [
+                          "b"
+                        ],
+                        "text": "b",
+                        "type": "Identifier"
+                      }
+                    ],
+                    "end": 5,
+                    "start": 4,
+                    "terminalNodeText": [],
+                    "type": "MemberInvocation"
+                  }
+                ],
+                "end": 5,
+                "start": 4,
+                "terminalNodeText": [],
+                "type": "InvocationTerm"
+              }
+            ],
+            "end": 5,
+            "start": 4,
+            "terminalNodeText": [],
+            "text": "b",
+            "type": "TermExpression"
+          }
+        ],
+        "end": 5,
+        "start": 0,
+        "terminalNodeText": [
+          "/"
+        ],
+        "type": "MultiplicativeExpression"
+      }
+    ]
+  },
+  "a < b": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "end": 1,
+                        "start": 0,
+                        "terminalNodeText": [
+                          "a"
+                        ],
+                        "text": "a",
+                        "type": "Identifier"
+                      }
+                    ],
+                    "end": 1,
+                    "start": 0,
+                    "terminalNodeText": [],
+                    "type": "MemberInvocation"
+                  }
+                ],
+                "end": 1,
+                "start": 0,
+                "terminalNodeText": [],
+                "type": "InvocationTerm"
+              }
+            ],
+            "end": 1,
+            "start": 0,
+            "terminalNodeText": [],
+            "text": "a",
+            "type": "TermExpression"
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "end": 5,
+                        "start": 4,
+                        "terminalNodeText": [
+                          "b"
+                        ],
+                        "text": "b",
+                        "type": "Identifier"
+                      }
+                    ],
+                    "end": 5,
+                    "start": 4,
+                    "terminalNodeText": [],
+                    "type": "MemberInvocation"
+                  }
+                ],
+                "end": 5,
+                "start": 4,
+                "terminalNodeText": [],
+                "type": "InvocationTerm"
+              }
+            ],
+            "end": 5,
+            "start": 4,
+            "terminalNodeText": [],
+            "text": "b",
+            "type": "TermExpression"
+          }
+        ],
+        "end": 5,
+        "start": 0,
+        "terminalNodeText": [
+          "<"
+        ],
+        "type": "InequalityExpression"
+      }
+    ]
+  },
+  "a <= b": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "end": 1,
+                        "start": 0,
+                        "terminalNodeText": [
+                          "a"
+                        ],
+                        "text": "a",
+                        "type": "Identifier"
+                      }
+                    ],
+                    "end": 1,
+                    "start": 0,
+                    "terminalNodeText": [],
+                    "type": "MemberInvocation"
+                  }
+                ],
+                "end": 1,
+                "start": 0,
+                "terminalNodeText": [],
+                "type": "InvocationTerm"
+              }
+            ],
+            "end": 1,
+            "start": 0,
+            "terminalNodeText": [],
+            "text": "a",
+            "type": "TermExpression"
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "end": 6,
+                        "start": 5,
+                        "terminalNodeText": [
+                          "b"
+                        ],
+                        "text": "b",
+                        "type": "Identifier"
+                      }
+                    ],
+                    "end": 6,
+                    "start": 5,
+                    "terminalNodeText": [],
+                    "type": "MemberInvocation"
+                  }
+                ],
+                "end": 6,
+                "start": 5,
+                "terminalNodeText": [],
+                "type": "InvocationTerm"
+              }
+            ],
+            "end": 6,
+            "start": 5,
+            "terminalNodeText": [],
+            "text": "b",
+            "type": "TermExpression"
+          }
+        ],
+        "end": 6,
+        "start": 0,
+        "terminalNodeText": [
+          "<="
+        ],
+        "type": "InequalityExpression"
+      }
+    ]
+  },
+  "a = b": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "end": 1,
+                        "start": 0,
+                        "terminalNodeText": [
+                          "a"
+                        ],
+                        "text": "a",
+                        "type": "Identifier"
+                      }
+                    ],
+                    "end": 1,
+                    "start": 0,
+                    "terminalNodeText": [],
+                    "type": "MemberInvocation"
+                  }
+                ],
+                "end": 1,
+                "start": 0,
+                "terminalNodeText": [],
+                "type": "InvocationTerm"
+              }
+            ],
+            "end": 1,
+            "start": 0,
+            "terminalNodeText": [],
+            "text": "a",
+            "type": "TermExpression"
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "end": 5,
+                        "start": 4,
+                        "terminalNodeText": [
+                          "b"
+                        ],
+                        "text": "b",
+                        "type": "Identifier"
+                      }
+                    ],
+                    "end": 5,
+                    "start": 4,
+                    "terminalNodeText": [],
+                    "type": "MemberInvocation"
+                  }
+                ],
+                "end": 5,
+                "start": 4,
+                "terminalNodeText": [],
+                "type": "InvocationTerm"
+              }
+            ],
+            "end": 5,
+            "start": 4,
+            "terminalNodeText": [],
+            "text": "b",
+            "type": "TermExpression"
+          }
+        ],
+        "end": 5,
+        "start": 0,
+        "terminalNodeText": [
+          "="
+        ],
+        "type": "EqualityExpression"
+      }
+    ]
+  },
+  "a > b": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "end": 1,
+                        "start": 0,
+                        "terminalNodeText": [
+                          "a"
+                        ],
+                        "text": "a",
+                        "type": "Identifier"
+                      }
+                    ],
+                    "end": 1,
+                    "start": 0,
+                    "terminalNodeText": [],
+                    "type": "MemberInvocation"
+                  }
+                ],
+                "end": 1,
+                "start": 0,
+                "terminalNodeText": [],
+                "type": "InvocationTerm"
+              }
+            ],
+            "end": 1,
+            "start": 0,
+            "terminalNodeText": [],
+            "text": "a",
+            "type": "TermExpression"
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "end": 5,
+                        "start": 4,
+                        "terminalNodeText": [
+                          "b"
+                        ],
+                        "text": "b",
+                        "type": "Identifier"
+                      }
+                    ],
+                    "end": 5,
+                    "start": 4,
+                    "terminalNodeText": [],
+                    "type": "MemberInvocation"
+                  }
+                ],
+                "end": 5,
+                "start": 4,
+                "terminalNodeText": [],
+                "type": "InvocationTerm"
+              }
+            ],
+            "end": 5,
+            "start": 4,
+            "terminalNodeText": [],
+            "text": "b",
+            "type": "TermExpression"
+          }
+        ],
+        "end": 5,
+        "start": 0,
+        "terminalNodeText": [
+          ">"
+        ],
+        "type": "InequalityExpression"
+      }
+    ]
+  },
+  "a >= b": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "end": 1,
+                        "start": 0,
+                        "terminalNodeText": [
+                          "a"
+                        ],
+                        "text": "a",
+                        "type": "Identifier"
+                      }
+                    ],
+                    "end": 1,
+                    "start": 0,
+                    "terminalNodeText": [],
+                    "type": "MemberInvocation"
+                  }
+                ],
+                "end": 1,
+                "start": 0,
+                "terminalNodeText": [],
+                "type": "InvocationTerm"
+              }
+            ],
+            "end": 1,
+            "start": 0,
+            "terminalNodeText": [],
+            "text": "a",
+            "type": "TermExpression"
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "end": 6,
+                        "start": 5,
+                        "terminalNodeText": [
+                          "b"
+                        ],
+                        "text": "b",
+                        "type": "Identifier"
+                      }
+                    ],
+                    "end": 6,
+                    "start": 5,
+                    "terminalNodeText": [],
+                    "type": "MemberInvocation"
+                  }
+                ],
+                "end": 6,
+                "start": 5,
+                "terminalNodeText": [],
+                "type": "InvocationTerm"
+              }
+            ],
+            "end": 6,
+            "start": 5,
+            "terminalNodeText": [],
+            "text": "b",
+            "type": "TermExpression"
+          }
+        ],
+        "end": 6,
+        "start": 0,
+        "terminalNodeText": [
+          ">="
+        ],
+        "type": "InequalityExpression"
+      }
+    ]
+  },
+  "a and b": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "end": 1,
+                        "start": 0,
+                        "terminalNodeText": [
+                          "a"
+                        ],
+                        "text": "a",
+                        "type": "Identifier"
+                      }
+                    ],
+                    "end": 1,
+                    "start": 0,
+                    "terminalNodeText": [],
+                    "type": "MemberInvocation"
+                  }
+                ],
+                "end": 1,
+                "start": 0,
+                "terminalNodeText": [],
+                "type": "InvocationTerm"
+              }
+            ],
+            "end": 1,
+            "start": 0,
+            "terminalNodeText": [],
+            "text": "a",
+            "type": "TermExpression"
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "end": 7,
+                        "start": 6,
+                        "terminalNodeText": [
+                          "b"
+                        ],
+                        "text": "b",
+                        "type": "Identifier"
+                      }
+                    ],
+                    "end": 7,
+                    "start": 6,
+                    "terminalNodeText": [],
+                    "type": "MemberInvocation"
+                  }
+                ],
+                "end": 7,
+                "start": 6,
+                "terminalNodeText": [],
+                "type": "InvocationTerm"
+              }
+            ],
+            "end": 7,
+            "start": 6,
+            "terminalNodeText": [],
+            "text": "b",
+            "type": "TermExpression"
+          }
+        ],
+        "end": 7,
+        "start": 0,
+        "terminalNodeText": [
+          "and"
+        ],
+        "type": "AndExpression"
+      }
+    ]
+  },
+  "a as string": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "end": 1,
+                        "start": 0,
+                        "terminalNodeText": [
+                          "a"
+                        ],
+                        "text": "a",
+                        "type": "Identifier"
+                      }
+                    ],
+                    "end": 1,
+                    "start": 0,
+                    "terminalNodeText": [],
+                    "type": "MemberInvocation"
+                  }
+                ],
+                "end": 1,
+                "start": 0,
+                "terminalNodeText": [],
+                "type": "InvocationTerm"
+              }
+            ],
+            "end": 1,
+            "start": 0,
+            "terminalNodeText": [],
+            "text": "a",
+            "type": "TermExpression"
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "end": 11,
+                    "start": 5,
+                    "terminalNodeText": [
+                      "string"
+                    ],
+                    "text": "string",
+                    "type": "Identifier"
+                  }
+                ],
+                "end": 11,
+                "start": 5,
+                "terminalNodeText": [],
+                "type": "QualifiedIdentifier"
+              }
+            ],
+            "end": 11,
+            "start": 5,
+            "terminalNodeText": [],
+            "text": "string",
+            "type": "TypeSpecifier"
+          }
+        ],
+        "end": 11,
+        "start": 0,
+        "terminalNodeText": [
+          "as"
+        ],
+        "type": "TypeExpression"
+      }
+    ]
+  },
+  "a contains b": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "end": 1,
+                        "start": 0,
+                        "terminalNodeText": [
+                          "a"
+                        ],
+                        "text": "a",
+                        "type": "Identifier"
+                      }
+                    ],
+                    "end": 1,
+                    "start": 0,
+                    "terminalNodeText": [],
+                    "type": "MemberInvocation"
+                  }
+                ],
+                "end": 1,
+                "start": 0,
+                "terminalNodeText": [],
+                "type": "InvocationTerm"
+              }
+            ],
+            "end": 1,
+            "start": 0,
+            "terminalNodeText": [],
+            "text": "a",
+            "type": "TermExpression"
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "end": 12,
+                        "start": 11,
+                        "terminalNodeText": [
+                          "b"
+                        ],
+                        "text": "b",
+                        "type": "Identifier"
+                      }
+                    ],
+                    "end": 12,
+                    "start": 11,
+                    "terminalNodeText": [],
+                    "type": "MemberInvocation"
+                  }
+                ],
+                "end": 12,
+                "start": 11,
+                "terminalNodeText": [],
+                "type": "InvocationTerm"
+              }
+            ],
+            "end": 12,
+            "start": 11,
+            "terminalNodeText": [],
+            "text": "b",
+            "type": "TermExpression"
+          }
+        ],
+        "end": 12,
+        "start": 0,
+        "terminalNodeText": [
+          "contains"
+        ],
+        "type": "MembershipExpression"
+      }
+    ]
+  },
+  "a div b": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "end": 1,
+                        "start": 0,
+                        "terminalNodeText": [
+                          "a"
+                        ],
+                        "text": "a",
+                        "type": "Identifier"
+                      }
+                    ],
+                    "end": 1,
+                    "start": 0,
+                    "terminalNodeText": [],
+                    "type": "MemberInvocation"
+                  }
+                ],
+                "end": 1,
+                "start": 0,
+                "terminalNodeText": [],
+                "type": "InvocationTerm"
+              }
+            ],
+            "end": 1,
+            "start": 0,
+            "terminalNodeText": [],
+            "text": "a",
+            "type": "TermExpression"
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "end": 7,
+                        "start": 6,
+                        "terminalNodeText": [
+                          "b"
+                        ],
+                        "text": "b",
+                        "type": "Identifier"
+                      }
+                    ],
+                    "end": 7,
+                    "start": 6,
+                    "terminalNodeText": [],
+                    "type": "MemberInvocation"
+                  }
+                ],
+                "end": 7,
+                "start": 6,
+                "terminalNodeText": [],
+                "type": "InvocationTerm"
+              }
+            ],
+            "end": 7,
+            "start": 6,
+            "terminalNodeText": [],
+            "text": "b",
+            "type": "TermExpression"
+          }
+        ],
+        "end": 7,
+        "start": 0,
+        "terminalNodeText": [
+          "div"
+        ],
+        "type": "MultiplicativeExpression"
+      }
+    ]
+  },
+  "a implies b": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "end": 1,
+                        "start": 0,
+                        "terminalNodeText": [
+                          "a"
+                        ],
+                        "text": "a",
+                        "type": "Identifier"
+                      }
+                    ],
+                    "end": 1,
+                    "start": 0,
+                    "terminalNodeText": [],
+                    "type": "MemberInvocation"
+                  }
+                ],
+                "end": 1,
+                "start": 0,
+                "terminalNodeText": [],
+                "type": "InvocationTerm"
+              }
+            ],
+            "end": 1,
+            "start": 0,
+            "terminalNodeText": [],
+            "text": "a",
+            "type": "TermExpression"
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "end": 11,
+                        "start": 10,
+                        "terminalNodeText": [
+                          "b"
+                        ],
+                        "text": "b",
+                        "type": "Identifier"
+                      }
+                    ],
+                    "end": 11,
+                    "start": 10,
+                    "terminalNodeText": [],
+                    "type": "MemberInvocation"
+                  }
+                ],
+                "end": 11,
+                "start": 10,
+                "terminalNodeText": [],
+                "type": "InvocationTerm"
+              }
+            ],
+            "end": 11,
+            "start": 10,
+            "terminalNodeText": [],
+            "text": "b",
+            "type": "TermExpression"
+          }
+        ],
+        "end": 11,
+        "start": 0,
+        "terminalNodeText": [
+          "implies"
+        ],
+        "type": "ImpliesExpression"
+      }
+    ]
+  },
+  "a in b": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "end": 1,
+                        "start": 0,
+                        "terminalNodeText": [
+                          "a"
+                        ],
+                        "text": "a",
+                        "type": "Identifier"
+                      }
+                    ],
+                    "end": 1,
+                    "start": 0,
+                    "terminalNodeText": [],
+                    "type": "MemberInvocation"
+                  }
+                ],
+                "end": 1,
+                "start": 0,
+                "terminalNodeText": [],
+                "type": "InvocationTerm"
+              }
+            ],
+            "end": 1,
+            "start": 0,
+            "terminalNodeText": [],
+            "text": "a",
+            "type": "TermExpression"
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "end": 6,
+                        "start": 5,
+                        "terminalNodeText": [
+                          "b"
+                        ],
+                        "text": "b",
+                        "type": "Identifier"
+                      }
+                    ],
+                    "end": 6,
+                    "start": 5,
+                    "terminalNodeText": [],
+                    "type": "MemberInvocation"
+                  }
+                ],
+                "end": 6,
+                "start": 5,
+                "terminalNodeText": [],
+                "type": "InvocationTerm"
+              }
+            ],
+            "end": 6,
+            "start": 5,
+            "terminalNodeText": [],
+            "text": "b",
+            "type": "TermExpression"
+          }
+        ],
+        "end": 6,
+        "start": 0,
+        "terminalNodeText": [
+          "in"
+        ],
+        "type": "MembershipExpression"
+      }
+    ]
+  },
+  "a is Patient": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "end": 1,
+                        "start": 0,
+                        "terminalNodeText": [
+                          "a"
+                        ],
+                        "text": "a",
+                        "type": "Identifier"
+                      }
+                    ],
+                    "end": 1,
+                    "start": 0,
+                    "terminalNodeText": [],
+                    "type": "MemberInvocation"
+                  }
+                ],
+                "end": 1,
+                "start": 0,
+                "terminalNodeText": [],
+                "type": "InvocationTerm"
+              }
+            ],
+            "end": 1,
+            "start": 0,
+            "terminalNodeText": [],
+            "text": "a",
+            "type": "TermExpression"
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "end": 12,
+                    "start": 5,
+                    "terminalNodeText": [
+                      "Patient"
+                    ],
+                    "text": "Patient",
+                    "type": "Identifier"
+                  }
+                ],
+                "end": 12,
+                "start": 5,
+                "terminalNodeText": [],
+                "type": "QualifiedIdentifier"
+              }
+            ],
+            "end": 12,
+            "start": 5,
+            "terminalNodeText": [],
+            "text": "Patient",
+            "type": "TypeSpecifier"
+          }
+        ],
+        "end": 12,
+        "start": 0,
+        "terminalNodeText": [
+          "is"
+        ],
+        "type": "TypeExpression"
+      }
+    ]
+  },
+  "a mod b": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "end": 1,
+                        "start": 0,
+                        "terminalNodeText": [
+                          "a"
+                        ],
+                        "text": "a",
+                        "type": "Identifier"
+                      }
+                    ],
+                    "end": 1,
+                    "start": 0,
+                    "terminalNodeText": [],
+                    "type": "MemberInvocation"
+                  }
+                ],
+                "end": 1,
+                "start": 0,
+                "terminalNodeText": [],
+                "type": "InvocationTerm"
+              }
+            ],
+            "end": 1,
+            "start": 0,
+            "terminalNodeText": [],
+            "text": "a",
+            "type": "TermExpression"
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "end": 7,
+                        "start": 6,
+                        "terminalNodeText": [
+                          "b"
+                        ],
+                        "text": "b",
+                        "type": "Identifier"
+                      }
+                    ],
+                    "end": 7,
+                    "start": 6,
+                    "terminalNodeText": [],
+                    "type": "MemberInvocation"
+                  }
+                ],
+                "end": 7,
+                "start": 6,
+                "terminalNodeText": [],
+                "type": "InvocationTerm"
+              }
+            ],
+            "end": 7,
+            "start": 6,
+            "terminalNodeText": [],
+            "text": "b",
+            "type": "TermExpression"
+          }
+        ],
+        "end": 7,
+        "start": 0,
+        "terminalNodeText": [
+          "mod"
+        ],
+        "type": "MultiplicativeExpression"
+      }
+    ]
+  },
+  "a or b": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "end": 1,
+                        "start": 0,
+                        "terminalNodeText": [
+                          "a"
+                        ],
+                        "text": "a",
+                        "type": "Identifier"
+                      }
+                    ],
+                    "end": 1,
+                    "start": 0,
+                    "terminalNodeText": [],
+                    "type": "MemberInvocation"
+                  }
+                ],
+                "end": 1,
+                "start": 0,
+                "terminalNodeText": [],
+                "type": "InvocationTerm"
+              }
+            ],
+            "end": 1,
+            "start": 0,
+            "terminalNodeText": [],
+            "text": "a",
+            "type": "TermExpression"
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "end": 6,
+                        "start": 5,
+                        "terminalNodeText": [
+                          "b"
+                        ],
+                        "text": "b",
+                        "type": "Identifier"
+                      }
+                    ],
+                    "end": 6,
+                    "start": 5,
+                    "terminalNodeText": [],
+                    "type": "MemberInvocation"
+                  }
+                ],
+                "end": 6,
+                "start": 5,
+                "terminalNodeText": [],
+                "type": "InvocationTerm"
+              }
+            ],
+            "end": 6,
+            "start": 5,
+            "terminalNodeText": [],
+            "text": "b",
+            "type": "TermExpression"
+          }
+        ],
+        "end": 6,
+        "start": 0,
+        "terminalNodeText": [
+          "or"
+        ],
+        "type": "OrExpression"
+      }
+    ]
+  },
+  "a xor b": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "end": 1,
+                        "start": 0,
+                        "terminalNodeText": [
+                          "a"
+                        ],
+                        "text": "a",
+                        "type": "Identifier"
+                      }
+                    ],
+                    "end": 1,
+                    "start": 0,
+                    "terminalNodeText": [],
+                    "type": "MemberInvocation"
+                  }
+                ],
+                "end": 1,
+                "start": 0,
+                "terminalNodeText": [],
+                "type": "InvocationTerm"
+              }
+            ],
+            "end": 1,
+            "start": 0,
+            "terminalNodeText": [],
+            "text": "a",
+            "type": "TermExpression"
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "end": 7,
+                        "start": 6,
+                        "terminalNodeText": [
+                          "b"
+                        ],
+                        "text": "b",
+                        "type": "Identifier"
+                      }
+                    ],
+                    "end": 7,
+                    "start": 6,
+                    "terminalNodeText": [],
+                    "type": "MemberInvocation"
+                  }
+                ],
+                "end": 7,
+                "start": 6,
+                "terminalNodeText": [],
+                "type": "InvocationTerm"
+              }
+            ],
+            "end": 7,
+            "start": 6,
+            "terminalNodeText": [],
+            "text": "b",
+            "type": "TermExpression"
+          }
+        ],
+        "end": 7,
+        "start": 0,
+        "terminalNodeText": [
+          "xor"
+        ],
+        "type": "OrExpression"
+      }
+    ]
+  },
+  "a | b": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "end": 1,
+                        "start": 0,
+                        "terminalNodeText": [
+                          "a"
+                        ],
+                        "text": "a",
+                        "type": "Identifier"
+                      }
+                    ],
+                    "end": 1,
+                    "start": 0,
+                    "terminalNodeText": [],
+                    "type": "MemberInvocation"
+                  }
+                ],
+                "end": 1,
+                "start": 0,
+                "terminalNodeText": [],
+                "type": "InvocationTerm"
+              }
+            ],
+            "end": 1,
+            "start": 0,
+            "terminalNodeText": [],
+            "text": "a",
+            "type": "TermExpression"
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "end": 5,
+                        "start": 4,
+                        "terminalNodeText": [
+                          "b"
+                        ],
+                        "text": "b",
+                        "type": "Identifier"
+                      }
+                    ],
+                    "end": 5,
+                    "start": 4,
+                    "terminalNodeText": [],
+                    "type": "MemberInvocation"
+                  }
+                ],
+                "end": 5,
+                "start": 4,
+                "terminalNodeText": [],
+                "type": "InvocationTerm"
+              }
+            ],
+            "end": 5,
+            "start": 4,
+            "terminalNodeText": [],
+            "text": "b",
+            "type": "TermExpression"
+          }
+        ],
+        "end": 5,
+        "start": 0,
+        "terminalNodeText": [
+          "|"
+        ],
+        "type": "UnionExpression"
+      }
+    ]
+  },
+  "a ~ b": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "end": 1,
+                        "start": 0,
+                        "terminalNodeText": [
+                          "a"
+                        ],
+                        "text": "a",
+                        "type": "Identifier"
+                      }
+                    ],
+                    "end": 1,
+                    "start": 0,
+                    "terminalNodeText": [],
+                    "type": "MemberInvocation"
+                  }
+                ],
+                "end": 1,
+                "start": 0,
+                "terminalNodeText": [],
+                "type": "InvocationTerm"
+              }
+            ],
+            "end": 1,
+            "start": 0,
+            "terminalNodeText": [],
+            "text": "a",
+            "type": "TermExpression"
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "end": 5,
+                        "start": 4,
+                        "terminalNodeText": [
+                          "b"
+                        ],
+                        "text": "b",
+                        "type": "Identifier"
+                      }
+                    ],
+                    "end": 5,
+                    "start": 4,
+                    "terminalNodeText": [],
+                    "type": "MemberInvocation"
+                  }
+                ],
+                "end": 5,
+                "start": 4,
+                "terminalNodeText": [],
+                "type": "InvocationTerm"
+              }
+            ],
+            "end": 5,
+            "start": 4,
+            "terminalNodeText": [],
+            "text": "b",
+            "type": "TermExpression"
+          }
+        ],
+        "end": 5,
+        "start": 0,
+        "terminalNodeText": [
+          "~"
+        ],
+        "type": "EqualityExpression"
+      }
+    ]
+  },
+  "a.b": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "end": 1,
+                        "start": 0,
+                        "terminalNodeText": [
+                          "a"
+                        ],
+                        "text": "a",
+                        "type": "Identifier"
+                      }
+                    ],
+                    "end": 1,
+                    "start": 0,
+                    "terminalNodeText": [],
+                    "type": "MemberInvocation"
+                  }
+                ],
+                "end": 1,
+                "start": 0,
+                "terminalNodeText": [],
+                "type": "InvocationTerm"
+              }
+            ],
+            "end": 1,
+            "start": 0,
+            "terminalNodeText": [],
+            "text": "a",
+            "type": "TermExpression"
+          },
+          {
+            "children": [
+              {
+                "end": 3,
+                "start": 2,
+                "terminalNodeText": [
+                  "b"
+                ],
+                "text": "b",
+                "type": "Identifier"
+              }
+            ],
+            "end": 3,
+            "start": 2,
+            "terminalNodeText": [],
+            "type": "MemberInvocation"
+          }
+        ],
+        "end": 3,
+        "start": 0,
+        "terminalNodeText": [
+          "."
+        ],
+        "text": "a.b",
+        "type": "InvocationExpression"
+      }
+    ]
+  },
+  "a.b + 2": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "end": 1,
+                            "start": 0,
+                            "terminalNodeText": [
+                              "a"
+                            ],
+                            "text": "a",
+                            "type": "Identifier"
+                          }
+                        ],
+                        "end": 1,
+                        "start": 0,
+                        "terminalNodeText": [],
+                        "type": "MemberInvocation"
+                      }
+                    ],
+                    "end": 1,
+                    "start": 0,
+                    "terminalNodeText": [],
+                    "type": "InvocationTerm"
+                  }
+                ],
+                "end": 1,
+                "start": 0,
+                "terminalNodeText": [],
+                "text": "a",
+                "type": "TermExpression"
+              },
+              {
+                "children": [
+                  {
+                    "end": 3,
+                    "start": 2,
+                    "terminalNodeText": [
+                      "b"
+                    ],
+                    "text": "b",
+                    "type": "Identifier"
+                  }
+                ],
+                "end": 3,
+                "start": 2,
+                "terminalNodeText": [],
+                "type": "MemberInvocation"
+              }
+            ],
+            "end": 3,
+            "start": 0,
+            "terminalNodeText": [
+              "."
+            ],
+            "text": "a.b",
+            "type": "InvocationExpression"
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "end": 7,
+                    "start": 6,
+                    "terminalNodeText": [
+                      "2"
+                    ],
+                    "text": "2",
+                    "type": "NumberLiteral"
+                  }
+                ],
+                "end": 7,
+                "start": 6,
+                "terminalNodeText": [],
+                "text": "2",
+                "type": "LiteralTerm"
+              }
+            ],
+            "end": 7,
+            "start": 6,
+            "terminalNodeText": [],
+            "text": "2",
+            "type": "TermExpression"
+          }
+        ],
+        "end": 7,
+        "start": 0,
+        "terminalNodeText": [
+          "+"
+        ],
+        "type": "AdditiveExpression"
+      }
+    ]
+  },
+  "a.b.c.d.e": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "children": [
+                                  {
+                                    "end": 1,
+                                    "start": 0,
+                                    "terminalNodeText": [
+                                      "a"
+                                    ],
+                                    "text": "a",
+                                    "type": "Identifier"
+                                  }
+                                ],
+                                "end": 1,
+                                "start": 0,
+                                "terminalNodeText": [],
+                                "type": "MemberInvocation"
+                              }
+                            ],
+                            "end": 1,
+                            "start": 0,
+                            "terminalNodeText": [],
+                            "type": "InvocationTerm"
+                          }
+                        ],
+                        "end": 1,
+                        "start": 0,
+                        "terminalNodeText": [],
+                        "text": "a",
+                        "type": "TermExpression"
+                      },
+                      {
+                        "children": [
+                          {
+                            "end": 3,
+                            "start": 2,
+                            "terminalNodeText": [
+                              "b"
+                            ],
+                            "text": "b",
+                            "type": "Identifier"
+                          }
+                        ],
+                        "end": 3,
+                        "start": 2,
+                        "terminalNodeText": [],
+                        "type": "MemberInvocation"
+                      }
+                    ],
+                    "end": 3,
+                    "start": 0,
+                    "terminalNodeText": [
+                      "."
+                    ],
+                    "text": "a.b",
+                    "type": "InvocationExpression"
+                  },
+                  {
+                    "children": [
+                      {
+                        "end": 5,
+                        "start": 4,
+                        "terminalNodeText": [
+                          "c"
+                        ],
+                        "text": "c",
+                        "type": "Identifier"
+                      }
+                    ],
+                    "end": 5,
+                    "start": 4,
+                    "terminalNodeText": [],
+                    "type": "MemberInvocation"
+                  }
+                ],
+                "end": 5,
+                "start": 0,
+                "terminalNodeText": [
+                  "."
+                ],
+                "text": "a.b.c",
+                "type": "InvocationExpression"
+              },
+              {
+                "children": [
+                  {
+                    "end": 7,
+                    "start": 6,
+                    "terminalNodeText": [
+                      "d"
+                    ],
+                    "text": "d",
+                    "type": "Identifier"
+                  }
+                ],
+                "end": 7,
+                "start": 6,
+                "terminalNodeText": [],
+                "type": "MemberInvocation"
+              }
+            ],
+            "end": 7,
+            "start": 0,
+            "terminalNodeText": [
+              "."
+            ],
+            "text": "a.b.c.d",
+            "type": "InvocationExpression"
+          },
+          {
+            "children": [
+              {
+                "end": 9,
+                "start": 8,
+                "terminalNodeText": [
+                  "e"
+                ],
+                "text": "e",
+                "type": "Identifier"
+              }
+            ],
+            "end": 9,
+            "start": 8,
+            "terminalNodeText": [],
+            "type": "MemberInvocation"
+          }
+        ],
+        "end": 9,
+        "start": 0,
+        "terminalNodeText": [
+          "."
+        ],
+        "text": "a.b.c.d.e",
+        "type": "InvocationExpression"
+      }
+    ]
+  },
+  "a[0]": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "end": 1,
+                        "start": 0,
+                        "terminalNodeText": [
+                          "a"
+                        ],
+                        "text": "a",
+                        "type": "Identifier"
+                      }
+                    ],
+                    "end": 1,
+                    "start": 0,
+                    "terminalNodeText": [],
+                    "type": "MemberInvocation"
+                  }
+                ],
+                "end": 1,
+                "start": 0,
+                "terminalNodeText": [],
+                "type": "InvocationTerm"
+              }
+            ],
+            "end": 1,
+            "start": 0,
+            "terminalNodeText": [],
+            "text": "a",
+            "type": "TermExpression"
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "end": 3,
+                    "start": 2,
+                    "terminalNodeText": [
+                      "0"
+                    ],
+                    "text": "0",
+                    "type": "NumberLiteral"
+                  }
+                ],
+                "end": 3,
+                "start": 2,
+                "terminalNodeText": [],
+                "text": "0",
+                "type": "LiteralTerm"
+              }
+            ],
+            "end": 3,
+            "start": 2,
+            "terminalNodeText": [],
+            "text": "0",
+            "type": "TermExpression"
+          }
+        ],
+        "end": 4,
+        "start": 0,
+        "terminalNodeText": [
+          "[",
+          "]"
+        ],
+        "type": "IndexerExpression"
+      }
+    ]
+  },
+  "false": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "end": 5,
+                "start": 0,
+                "terminalNodeText": [
+                  "false"
+                ],
+                "text": "false",
+                "type": "BooleanLiteral"
+              }
+            ],
+            "end": 5,
+            "start": 0,
+            "terminalNodeText": [],
+            "text": "false",
+            "type": "LiteralTerm"
+          }
+        ],
+        "end": 5,
+        "start": 0,
+        "terminalNodeText": [],
+        "text": "false",
+        "type": "TermExpression"
+      }
+    ]
+  },
+  "iif(true, 1, 2)": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "end": 3,
+                        "start": 0,
+                        "terminalNodeText": [
+                          "iif"
+                        ],
+                        "text": "iif",
+                        "type": "Identifier"
+                      },
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "children": [
+                                  {
+                                    "end": 8,
+                                    "start": 4,
+                                    "terminalNodeText": [
+                                      "true"
+                                    ],
+                                    "text": "true",
+                                    "type": "BooleanLiteral"
+                                  }
+                                ],
+                                "end": 8,
+                                "start": 4,
+                                "terminalNodeText": [],
+                                "text": "true",
+                                "type": "LiteralTerm"
+                              }
+                            ],
+                            "end": 8,
+                            "start": 4,
+                            "terminalNodeText": [],
+                            "text": "true",
+                            "type": "TermExpression"
+                          },
+                          {
+                            "children": [
+                              {
+                                "children": [
+                                  {
+                                    "end": 11,
+                                    "start": 10,
+                                    "terminalNodeText": [
+                                      "1"
+                                    ],
+                                    "text": "1",
+                                    "type": "NumberLiteral"
+                                  }
+                                ],
+                                "end": 11,
+                                "start": 10,
+                                "terminalNodeText": [],
+                                "text": "1",
+                                "type": "LiteralTerm"
+                              }
+                            ],
+                            "end": 11,
+                            "start": 10,
+                            "terminalNodeText": [],
+                            "text": "1",
+                            "type": "TermExpression"
+                          },
+                          {
+                            "children": [
+                              {
+                                "children": [
+                                  {
+                                    "end": 14,
+                                    "start": 13,
+                                    "terminalNodeText": [
+                                      "2"
+                                    ],
+                                    "text": "2",
+                                    "type": "NumberLiteral"
+                                  }
+                                ],
+                                "end": 14,
+                                "start": 13,
+                                "terminalNodeText": [],
+                                "text": "2",
+                                "type": "LiteralTerm"
+                              }
+                            ],
+                            "end": 14,
+                            "start": 13,
+                            "terminalNodeText": [],
+                            "text": "2",
+                            "type": "TermExpression"
+                          }
+                        ],
+                        "end": 14,
+                        "start": 4,
+                        "terminalNodeText": [
+                          ",",
+                          ","
+                        ],
+                        "type": "ParamList"
+                      }
+                    ],
+                    "end": 15,
+                    "start": 0,
+                    "terminalNodeText": [
+                      "(",
+                      ")"
+                    ],
+                    "type": "Functn"
+                  }
+                ],
+                "end": 15,
+                "start": 0,
+                "terminalNodeText": [],
+                "type": "FunctionInvocation"
+              }
+            ],
+            "end": 15,
+            "start": 0,
+            "terminalNodeText": [],
+            "type": "InvocationTerm"
+          }
+        ],
+        "end": 15,
+        "start": 0,
+        "terminalNodeText": [],
+        "text": "iif(true,1,2)",
+        "type": "TermExpression"
+      }
+    ]
+  },
+  "someName": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "end": 8,
+                    "start": 0,
+                    "terminalNodeText": [
+                      "someName"
+                    ],
+                    "text": "someName",
+                    "type": "Identifier"
+                  }
+                ],
+                "end": 8,
+                "start": 0,
+                "terminalNodeText": [],
+                "type": "MemberInvocation"
+              }
+            ],
+            "end": 8,
+            "start": 0,
+            "terminalNodeText": [],
+            "type": "InvocationTerm"
+          }
+        ],
+        "end": 8,
+        "start": 0,
+        "terminalNodeText": [],
+        "text": "someName",
+        "type": "TermExpression"
+      }
+    ]
+  },
+  "true": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "end": 4,
+                "start": 0,
+                "terminalNodeText": [
+                  "true"
+                ],
+                "text": "true",
+                "type": "BooleanLiteral"
+              }
+            ],
+            "end": 4,
+            "start": 0,
+            "terminalNodeText": [],
+            "text": "true",
+            "type": "LiteralTerm"
+          }
+        ],
+        "end": 4,
+        "start": 0,
+        "terminalNodeText": [],
+        "text": "true",
+        "type": "TermExpression"
+      }
+    ]
+  },
+  "where()": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "end": 5,
+                        "start": 0,
+                        "terminalNodeText": [
+                          "where"
+                        ],
+                        "text": "where",
+                        "type": "Identifier"
+                      }
+                    ],
+                    "end": 7,
+                    "start": 0,
+                    "terminalNodeText": [
+                      "(",
+                      ")"
+                    ],
+                    "type": "Functn"
+                  }
+                ],
+                "end": 7,
+                "start": 0,
+                "terminalNodeText": [],
+                "type": "FunctionInvocation"
+              }
+            ],
+            "end": 7,
+            "start": 0,
+            "terminalNodeText": [],
+            "type": "InvocationTerm"
+          }
+        ],
+        "end": 7,
+        "start": 0,
+        "terminalNodeText": [],
+        "text": "where()",
+        "type": "TermExpression"
+      }
+    ]
+  },
+  "where(true)": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "end": 5,
+                        "start": 0,
+                        "terminalNodeText": [
+                          "where"
+                        ],
+                        "text": "where",
+                        "type": "Identifier"
+                      },
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "children": [
+                                  {
+                                    "end": 10,
+                                    "start": 6,
+                                    "terminalNodeText": [
+                                      "true"
+                                    ],
+                                    "text": "true",
+                                    "type": "BooleanLiteral"
+                                  }
+                                ],
+                                "end": 10,
+                                "start": 6,
+                                "terminalNodeText": [],
+                                "text": "true",
+                                "type": "LiteralTerm"
+                              }
+                            ],
+                            "end": 10,
+                            "start": 6,
+                            "terminalNodeText": [],
+                            "text": "true",
+                            "type": "TermExpression"
+                          }
+                        ],
+                        "end": 10,
+                        "start": 6,
+                        "terminalNodeText": [],
+                        "type": "ParamList"
+                      }
+                    ],
+                    "end": 11,
+                    "start": 0,
+                    "terminalNodeText": [
+                      "(",
+                      ")"
+                    ],
+                    "type": "Functn"
+                  }
+                ],
+                "end": 11,
+                "start": 0,
+                "terminalNodeText": [],
+                "type": "FunctionInvocation"
+              }
+            ],
+            "end": 11,
+            "start": 0,
+            "terminalNodeText": [],
+            "type": "InvocationTerm"
+          }
+        ],
+        "end": 11,
+        "start": 0,
+        "terminalNodeText": [],
+        "text": "where(true)",
+        "type": "TermExpression"
+      }
+    ]
+  },
+  "x is integer": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "end": 1,
+                        "start": 0,
+                        "terminalNodeText": [
+                          "x"
+                        ],
+                        "text": "x",
+                        "type": "Identifier"
+                      }
+                    ],
+                    "end": 1,
+                    "start": 0,
+                    "terminalNodeText": [],
+                    "type": "MemberInvocation"
+                  }
+                ],
+                "end": 1,
+                "start": 0,
+                "terminalNodeText": [],
+                "type": "InvocationTerm"
+              }
+            ],
+            "end": 1,
+            "start": 0,
+            "terminalNodeText": [],
+            "text": "x",
+            "type": "TermExpression"
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "end": 12,
+                    "start": 5,
+                    "terminalNodeText": [
+                      "integer"
+                    ],
+                    "text": "integer",
+                    "type": "Identifier"
+                  }
+                ],
+                "end": 12,
+                "start": 5,
+                "terminalNodeText": [],
+                "type": "QualifiedIdentifier"
+              }
+            ],
+            "end": 12,
+            "start": 5,
+            "terminalNodeText": [],
+            "text": "integer",
+            "type": "TypeSpecifier"
+          }
+        ],
+        "end": 12,
+        "start": 0,
+        "terminalNodeText": [
+          "is"
+        ],
+        "type": "TypeExpression"
+      }
+    ]
+  },
+  "{}": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "end": 2,
+                "start": 0,
+                "terminalNodeText": [
+                  "{",
+                  "}"
+                ],
+                "text": "{}",
+                "type": "NullLiteral"
+              }
+            ],
+            "end": 2,
+            "start": 0,
+            "terminalNodeText": [],
+            "text": "{}",
+            "type": "LiteralTerm"
+          }
+        ],
+        "end": 2,
+        "start": 0,
+        "terminalNodeText": [],
+        "text": "{}",
+        "type": "TermExpression"
+      }
+    ]
+  }
+}

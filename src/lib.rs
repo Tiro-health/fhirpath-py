@@ -1,5 +1,7 @@
 pub mod analyze;
+pub mod ast;
 pub mod bindings;
+pub mod compat;
 pub mod lexer;
 pub mod parser;
 pub mod resolve;
@@ -12,7 +14,7 @@ use lexer::tokenize;
 use parser::Parser;
 
 /// Byte offset range into the source string.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct Span {
     pub byte_start: usize,
     pub byte_end: usize,
