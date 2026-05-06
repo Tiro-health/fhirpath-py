@@ -57,6 +57,22 @@ pub enum Expr {
     },
 }
 
+impl Expr {
+    /// Span covering this expression in the source.
+    pub fn span(&self) -> &Span {
+        match self {
+            Expr::Binary { span, .. }
+            | Expr::Polarity { span, .. }
+            | Expr::Type { span, .. }
+            | Expr::Indexer { span, .. }
+            | Expr::Invocation { span, .. }
+            | Expr::Parenthesized { span, .. }
+            | Expr::ExternalConstant { span, .. } => span,
+            Expr::Literal(lit) => lit.span(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub enum Invocation {
     Member {
@@ -78,6 +94,19 @@ pub enum Invocation {
     },
 }
 
+impl Invocation {
+    /// Span covering this invocation in the source.
+    pub fn span(&self) -> &Span {
+        match self {
+            Invocation::Member { ident } => &ident.span,
+            Invocation::Function { span, .. }
+            | Invocation::This { span }
+            | Invocation::Index { span }
+            | Invocation::Total { span } => span,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub enum Literal {
     Null { span: Span },
@@ -89,6 +118,21 @@ pub enum Literal {
     Time { raw: String, span: Span },
 }
 
+impl Literal {
+    /// Span covering this literal in the source.
+    pub fn span(&self) -> &Span {
+        match self {
+            Literal::Null { span }
+            | Literal::Boolean { span, .. }
+            | Literal::String { span, .. }
+            | Literal::Number { span, .. }
+            | Literal::Quantity { span, .. }
+            | Literal::DateTime { span, .. }
+            | Literal::Time { span, .. } => span,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub enum Unit {
     String { raw: String, span: Span },
@@ -96,10 +140,31 @@ pub enum Unit {
     PluralDateTimePrecision { word: String, span: Span },
 }
 
+impl Unit {
+    /// Span covering this unit in the source.
+    pub fn span(&self) -> &Span {
+        match self {
+            Unit::String { span, .. }
+            | Unit::DateTimePrecision { span, .. }
+            | Unit::PluralDateTimePrecision { span, .. } => span,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub enum ExternalConstantId {
     Identifier(Identifier),
     String { raw: String, span: Span },
+}
+
+impl ExternalConstantId {
+    /// Span covering this identifier reference in the source.
+    pub fn span(&self) -> &Span {
+        match self {
+            ExternalConstantId::Identifier(id) => &id.span,
+            ExternalConstantId::String { span, .. } => span,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
