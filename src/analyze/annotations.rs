@@ -712,7 +712,8 @@ fn find_answer_refs(expr: &Expr, out: &mut Vec<Annotation>, diagnostics: &mut Ve
                         kind,
                         attribution: result.attribution,
                     });
-                    return; // Don't recurse into children of a matched node
+                    recurse_into_chain_args(target, out, diagnostics);
+                    return;
                 }
                 MatchOutcome::Unattributable => {
                     diagnostics.push(Diagnostic {
@@ -723,6 +724,7 @@ fn find_answer_refs(expr: &Expr, out: &mut Vec<Annotation>, diagnostics: &mut Ve
                             "Expression navigates into a QuestionnaireResponse but cannot be attributed to a specific linkId"
                                 .to_string(),
                     });
+                    recurse_into_chain_args(target, out, diagnostics);
                     return;
                 }
                 MatchOutcome::NotApplicable => {
@@ -762,6 +764,40 @@ fn find_answer_refs(expr: &Expr, out: &mut Vec<Annotation>, diagnostics: &mut Ve
             find_answer_refs(inner, out, diagnostics);
         }
         Expr::Literal(_) | Expr::ExternalConstant { .. } => {}
+    }
+}
+
+/// Walk the chain spine, recursing into the arguments of every function call
+/// (and the index expression of every indexer). The spine itself is consumed
+/// by `decompose_chain`, so visiting it again would only re-emit the same
+/// annotation; arg subtrees are independent and may contain their own QR
+/// references.
+fn recurse_into_chain_args(
+    expr: &Expr,
+    out: &mut Vec<Annotation>,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    let mut cursor = expr;
+    loop {
+        let stripped = unwrap_parens(cursor);
+        match stripped {
+            Expr::Invocation { receiver, call, .. } => {
+                if let Invocation::Function { args, .. } = call {
+                    for a in args {
+                        find_answer_refs(a, out, diagnostics);
+                    }
+                }
+                match receiver {
+                    Some(r) => cursor = r,
+                    None => break,
+                }
+            }
+            Expr::Indexer { receiver, index, .. } => {
+                find_answer_refs(index, out, diagnostics);
+                cursor = receiver;
+            }
+            _ => break,
+        }
     }
 }
 
@@ -1395,6 +1431,35 @@ mod tests {
             .diagnostics
             .iter()
             .all(|d| d.code != DiagnosticCode::InvalidAccessorForType));
+    }
+
+    #[test]
+    fn test_nested_answer_ref_in_where_predicate_is_surfaced() {
+        // The outer chain matches as an ItemReference for 'x'; the inner
+        // chain inside the where() predicate is an AnswerReference to 'y'.
+        // Both should be surfaced — see issue #61.
+        let r = annotate_expression(
+            "item.where(linkId='x').where(item.where(linkId='y').answer.value = 'yes')",
+        )
+        .unwrap();
+        assert!(r.iter().any(|a| matches!(&a.kind, AnnotationKind::ItemReference { link_ids }
+            if link_ids == &["x"])));
+        assert!(r.iter().any(|a| matches!(&a.kind, AnnotationKind::AnswerReference { link_ids, accessor }
+            if link_ids == &["y"] && *accessor == ValueAccessor::Value)));
+    }
+
+    #[test]
+    fn test_nested_answer_ref_under_unattributable_outer() {
+        // Outer chain ends Unattributable (emits a diagnostic); the inner
+        // arg still hosts a clean answer reference and must be surfaced.
+        let (annotations, diagnostics) = annotate_expression_with_diagnostics(
+            "item.iif(linkId='x', item.where(linkId='y').answer.value, 'fallback')",
+        )
+        .unwrap();
+        assert!(annotations.iter().any(|a| matches!(&a.kind, AnnotationKind::AnswerReference { link_ids, .. }
+            if link_ids == &["y"])));
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].code, DiagnosticCode::ExpressionNotAttributable);
     }
 
     #[test]

@@ -32,11 +32,11 @@ fn collect_link_ids_recursive(expr: &Expr, out: &mut Vec<(String, Span)>) {
                     }
                 }
             }
-            // Match legacy behavior: skip recursing into children entirely
-            // after a chain match. The chain decomposition from the outermost
-            // node already captures all top-level linkIds, and inner Invocation
-            // nodes would produce duplicates. (Side effect: linkIds buried in
-            // non-linkId where-predicates aren't validated — preserved as-is.)
+            // Walk the chain spine and recurse into function arguments and
+            // indexer index expressions — those sub-trees aren't visited by
+            // `decompose_chain` and may carry their own linkId references
+            // (e.g. inside a non-linkId `where()` predicate).
+            recurse_into_chain_args(expr, out);
             return;
         }
     }
@@ -65,6 +65,37 @@ fn collect_link_ids_recursive(expr: &Expr, out: &mut Vec<(String, Span)>) {
         }
         Expr::Parenthesized { inner, .. } => collect_link_ids_recursive(inner, out),
         Expr::Literal(_) | Expr::ExternalConstant { .. } => {}
+    }
+}
+
+/// Walk the chain spine, recursing into function-call arguments and indexer
+/// index expressions. The spine itself is consumed by `decompose_chain`; arg
+/// subtrees are independent and may contain their own where(linkId=…) clauses.
+fn recurse_into_chain_args(expr: &Expr, out: &mut Vec<(String, Span)>) {
+    let mut cursor = expr;
+    loop {
+        let stripped = match cursor {
+            Expr::Parenthesized { inner, .. } => inner.as_ref(),
+            other => other,
+        };
+        match stripped {
+            Expr::Invocation { receiver, call, .. } => {
+                if let Invocation::Function { args, .. } = call {
+                    for a in args {
+                        collect_link_ids_recursive(a, out);
+                    }
+                }
+                match receiver {
+                    Some(r) => cursor = r.as_ref(),
+                    None => break,
+                }
+            }
+            Expr::Indexer { receiver, index, .. } => {
+                collect_link_ids_recursive(index, out);
+                cursor = receiver.as_ref();
+            }
+            _ => break,
+        }
     }
 }
 
@@ -229,6 +260,39 @@ mod tests {
         )
         .unwrap();
         assert!(diags.is_empty());
+    }
+
+    #[test]
+    fn test_nested_link_id_in_non_link_id_where_predicate_is_validated() {
+        // The outer chain's first where() collects 'choice1'; the second
+        // where() has a non-linkId predicate that itself contains a chain
+        // referencing a bogus linkId. That nested reference must be
+        // validated — see issue #60.
+        let idx = QuestionnaireIndex::build(&sample_questionnaire());
+        let diags = validate_link_ids_from_expr(
+            "item.where(linkId='choice1').answer.where(item.where(linkId='nonexistent').answer.value = 'yes')",
+            &idx,
+            None,
+        )
+        .unwrap();
+        assert_eq!(diags.len(), 1);
+        assert_eq!(diags[0].code, DiagnosticCode::UnknownLinkId);
+        assert!(diags[0].message.contains("nonexistent"));
+    }
+
+    #[test]
+    fn test_nested_link_id_no_duplicate() {
+        // Sanity: a linkId that appears only on the spine isn't picked up
+        // twice when we also descend into args.
+        let idx = QuestionnaireIndex::build(&sample_questionnaire());
+        let diags = validate_link_ids_from_expr(
+            "item.where(linkId='nope').answer.where(value = 'x')",
+            &idx,
+            None,
+        )
+        .unwrap();
+        assert_eq!(diags.len(), 1);
+        assert!(diags[0].message.contains("nope"));
     }
 
     #[test]
